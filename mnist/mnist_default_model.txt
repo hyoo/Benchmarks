@@ -1,0 +1,4 @@
+[Global_Params]
+model_name = 'mnist'
+epochs=2
+batch_size=128
