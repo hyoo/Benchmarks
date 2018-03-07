@@ -2,6 +2,7 @@ from keras.models import Model
 from keras.layers import Input, merge, Conv2D, MaxPooling2D, UpSampling2D, Dropout, Cropping2D, Concatenate
 from keras.optimizers import *
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
+import numpy as np
 
 #############################################
 import unet_benchmark as benchmark
@@ -40,7 +41,7 @@ def run(gParameters, data):
 
     # predict & save result in npy format
     imgs_mask_test = model.predict(imgs_test, batch_size=1, verbose=1)
-    np.save(gParameters['test_mask_data'], imgs_mask_test)
+    np.save(gParameters['test_label_data'], imgs_mask_test)
 
 
 def get_model(img_rows, img_cols):
