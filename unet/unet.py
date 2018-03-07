@@ -98,7 +98,7 @@ def get_model(img_rows, img_cols):
     model = Model(inputs, conv10, name='unet')
 
     model.compile(optimizer = Adam(lr = 1e-4), loss = 'binary_crossentropy', metrics = ['accuracy'])
-
+    model.summary()
     return model
 
 #############################################

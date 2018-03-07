@@ -12,7 +12,7 @@ from keras import backend as K
 
 def initialize_parameters():
     my_benchmark = benchmark.UNET(benchmark.file_path,
-        'unet_default_model.txt',
+        'unet_configurable_model.txt',
         'keras',
         prog='unet_configurable',
         desc='UNET example'
@@ -31,7 +31,7 @@ def load_data(gParameters):
 def run(gParameters, data):
 
     #############################################
-    model = get_model(512, 512)
+    model = build_model(gParameters, 512, 512)
     imgs_train, imgs_mask_train, imgs_test = data
 
     # train
@@ -113,6 +113,50 @@ def dice_coef(y_true, y_pred):
 # custom loss
 def dice_coef_loss(y_true, y_pred):
     return -dice_coef(y_true, y_pred)
+
+def build_model(gParameters, img_rows, img_cols):
+    # network params
+    n_layers = gParameters['n_layers']
+    filter_size = gParameters['filter_size']
+    dropout = gParameters['dropout']
+    activation = gParameters['activation']
+    kernel_initializer = gParameters['kernel_initializer']
+
+    inputs = Input((img_rows, img_cols, 1))
+    conv_layers = []
+    pool_layers = [inputs]
+
+    for i in range(n_layers):
+        conv = Conv2D(filter_size, 3, activation = activation, padding = 'same', kernel_initializer = kernel_initializer)(pool_layers[i])
+        conv = Conv2D(filter_size, 3, activation = activation, padding = 'same', kernel_initializer = kernel_initializer)(conv)
+        if dropout != None and i >= (n_layers - 2):
+            conv = Dropout(dropout)(conv)
+        pool = MaxPooling2D(pool_size = (2, 2))(conv)
+        conv_layers.append(conv)
+        pool_layers.append(pool)
+        filter_size *= 2
+
+    filter_size //= 4 # or filter_size = int(filter_size)
+
+    for i in range(n_layers-1):
+        up = Conv2D(filter_size, 2, activation = activation, padding = 'same')(UpSampling2D(size = (2,2))(conv_layers[-1]))
+        merge = Concatenate(axis=3)([conv_layers[n_layers-i-2], up])
+
+        conv = Conv2D(filter_size, 3, activation = activation, padding = 'same', kernel_initializer = kernel_initializer)(merge)
+        conv = Conv2D(filter_size, 3, activation = activation, padding = 'same', kernel_initializer = kernel_initializer)(conv)
+        conv_layers.append(conv)
+        filter_size //= 2  # or filter_size = int(filter_size)
+
+    # last layer
+    last_conv = Conv2D(2, 3, activation = activation, padding = 'same', kernel_initializer = kernel_initializer)(conv_layers[-1])
+    last_conv = Conv2D(1, 1, activation = 'sigmoid')(last_conv)
+
+    model = Model(inputs, last_conv)
+
+    model.compile(optimizer=Adam(lr=1e-5), loss=dice_coef_loss, metrics=[dice_coef])
+    model.summary()
+
+    return model
 
 #############################################
 def main():
