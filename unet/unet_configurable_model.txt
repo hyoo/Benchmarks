@@ -7,7 +7,7 @@ test_label_data = 'data/img_test_mask.npy'
 epochs = 10
 batch_size = 4
 
-n_layers = 7
+n_layers = 5
 filter_size = 64
 dropout = 0.5
 activation = "relu"
