@@ -11,21 +11,13 @@ except ImportError:
 
 import default_utils
 
+additional_definitions = None
+required = None
 
 class MNIST(default_utils.Benchmark):
-    def parse_from_benchmark(self):
-        pass
+    def set_locals(self):
+        if required is not None:
+            self.required = set(required)
+        if additional_definitions is not None:
+            self.additional_definitions = additional_definitions
 
-    def read_config_file(self, file):
-        config=configparser.ConfigParser()
-        config.read(file)
-        section=config.sections()
-
-        fileParams={}
-
-        # parse the remaining values
-        for k,v in config.items(section[0]):
-            if not k in fileParams:
-                fileParams[k] = eval(v)
-    
-        return fileParams

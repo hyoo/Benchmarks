@@ -1,6 +1,9 @@
 from __future__ import absolute_import
 
 import numpy as np
+import random
+from pprint import pprint
+import inspect
 
 import os
 import sys
@@ -25,9 +28,153 @@ DEFAULT_TIMEOUT = -1 # no timeout
 DEFAULT_DATATYPE = np.float32
 
 
+def set_seed(seed):
+    os.environ['PYTHONHASHSEED'] = '0'
+    np.random.seed(seed)
+
+    random.seed(seed)
+
+
 def fetch_file(link, subdir, untar=False, md5_hash=None):
     fname = os.path.basename(link)
     return get_file(fname, origin=link, untar=untar, md5_hash=md5_hash, cache_subdir=subdir)
+
+
+
+def eval_string_as_list(str_read, separator, dtype):
+    """Parse a string and convert it into a list of lists.
+
+        Parameters
+        ----------
+        str_read : string
+            string read (from configuration file or command line, for example)
+        separator : character
+            character that specifies the separation between the lists
+        dtype : data type
+            data type to decode the elements of the list
+
+        Return
+        ----------
+        decoded_list : list extracted from string and with elements of the
+            specified type.
+    """
+
+    # Figure out desired type
+    ldtype = dtype
+    if ldtype is None:
+        ldtype = np.int32
+
+    # Split list
+    decoded_list = []
+    out_list = str_read.split(separator)
+
+    # Convert to desired type
+    for el in out_list:
+        decoded_list.append( ldtype( el ) )
+
+    return decoded_list
+
+
+
+def eval_string_as_list_of_lists(str_read, separator_out, separator_in, dtype):
+    """Parse a string and convert it into a list of lists.
+
+        Parameters
+        ----------
+        str_read : string
+            string read (from configuration file or command line, for example)
+        separator_out : character
+            character that specifies the separation between the outer level lists
+        separator_in : character
+            character that specifies the separation between the inner level lists
+        dtype : data type
+            data type to decode the elements of the lists
+
+        Return
+        ----------
+        decoded_list : list of lists extracted from string and with elements
+            of the specified type.
+    """
+
+    # Figure out desired type
+    ldtype = dtype
+    if ldtype is None:
+        ldtype = np.int32
+
+    # Split outer list
+    decoded_list = []
+    out_list = str_read.split(separator_out)
+    # Split each internal list
+    for l in out_list:
+        in_list = []
+        elem = l.split(separator_in)
+        # Convert to desired type
+        for el in elem:
+            in_list.append( ldtype( el ) )
+        decoded_list.append( in_list )
+
+    return decoded_list
+
+
+def str2bool(v):
+    """ This is taken from:
+        https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
+        Because type=bool is not interpreted as a bool and action='store_true' cannot be
+        undone.
+    """
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+class ArgumentStruct:
+    """Structure to keep all the parameters from a
+       dictionary (corresponding to problem parameters)
+       under a unified object
+    """
+    def __init__(self, **entries):
+        self.__dict__.update(entries)
+
+
+
+class ListOfListsAction(argparse.Action):
+    def __init__(self, option_strings, dest, type, **kwargs):
+        """This action allows to construct a parser from a string
+           to a list of lists.
+           If no type is specified, an integer is assumed by default
+           as the type for the elements of the list of lists.
+        """
+
+        super(ListOfListsAction, self).__init__(option_strings, dest, **kwargs)
+        self.dtype = type
+        if self.dtype is None:
+            self.dtype = np.int32
+
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """This parses a string and maps into a list of lists.
+           It assumes that the separator between lists is a colon ':'
+           and the separator inside the list is a comma ','.
+           The values of the list are casted to the type specified.
+        """
+
+        decoded_list = []
+        removed1 = values.replace('[', '')
+        removed2 = removed1.replace(']', '')
+        out_list = removed2.split(':')
+
+        for l in out_list:
+            in_list = []
+            elem = l.split(',')
+            for el in elem:
+                in_list.append( self.dtype( el ) )
+            decoded_list.append( in_list )
+
+        setattr(namespace, self.dest, decoded_list)
+
 
 
 def initialize_parameters(bmk):
@@ -57,8 +204,11 @@ def initialize_parameters(bmk):
     #print ('Params:', fileParameters)
     # Consolidate parameter set. Command-line parameters overwrite file configuration
     gParameters = args_overwrite_config(args, fileParameters)
-    print ('Params:', gParameters)
-    
+    # Check that required set of parameters has been defined
+    bmk.check_required_exists(gParameters)
+    print ('Params:')
+    pprint(gParameters)
+
     return gParameters
 
 
@@ -72,7 +222,7 @@ def get_default_neon_parser(parser):
             parser for neon default command-line options
     """
     # Logging Level
-    parser.add_argument("-v", "--verbose", action="store_true",
+    parser.add_argument("-v", "--verbose", type=str2bool,
                         help="increase output verbosity")
     parser.add_argument("-l", "--log", dest='logfile',
                         default=None,
@@ -99,7 +249,7 @@ def get_default_neon_parser(parser):
                         help="number of units in fully connected layers in an integer array")
 
     # Data preprocessing
-    #parser.add_argument("--shuffle", action="store_true",
+    #parser.add_argument("--shuffle", type=str2bool,
     #                    default=True,
     #                    help="randomly shuffle data set (produces different training and testing partitions each run depending on the seed)")
 
@@ -127,11 +277,11 @@ def get_common_parser(parser):
     """
     
     # General behavior
-    parser.add_argument("--train", dest='train_bool', action="store_true",
-                        default=True, #type=bool,
+    parser.add_argument("--train", dest='train_bool', type=str2bool,
+                        default=True,
                         help="train model")
-    parser.add_argument("--evaluate", dest='eval_bool', action="store_true",
-                        default=argparse.SUPPRESS, #type=bool,
+    parser.add_argument("--evaluate", dest='eval_bool', type=str2bool,
+                        default=argparse.SUPPRESS,
                         help="evaluate model (use it for inference)")
 
     parser.add_argument("--timeout", dest='timeout', action="store",
@@ -171,7 +321,7 @@ def get_common_parser(parser):
     parser.add_argument("--conv", nargs='+', type=int,
                         default=argparse.SUPPRESS,
                         help="integer array describing convolution layers: conv1_filters, conv1_filter_len, conv1_stride, conv2_filters, conv2_filter_len, conv2_stride ...")
-    parser.add_argument("--locally_connected", action="store_true",
+    parser.add_argument("--locally_connected", type=str2bool,
                         default=argparse.SUPPRESS,
                         help="use locally connected layers instead of convolution layers")
     parser.add_argument("-a", "--activation",
@@ -197,7 +347,7 @@ def get_common_parser(parser):
     parser.add_argument("--pool", type=int,
                         default=argparse.SUPPRESS,
                         help="pooling layer length")
-    parser.add_argument("--batch_normalization", action="store_true",
+    parser.add_argument("--batch_normalization", type=str2bool,
                         default=argparse.SUPPRESS,
                         help="use batch normalization")
                         
@@ -218,8 +368,8 @@ def get_common_parser(parser):
                         default=argparse.SUPPRESS,
                         choices=['minabs', 'minmax', 'std', 'none'],
                         help="type of feature scaling; 'minabs': to [-1,1]; 'minmax': to [0,1], 'std': standard unit normalization; 'none': no normalization")
-    parser.add_argument("--shuffle", action="store_true",
-                        default=True,
+
+    parser.add_argument("--shuffle", type=str2bool, default=argparse.SUPPRESS,
                         help="randomly shuffle data set (produces different training and testing partitions each run depending on the seed)")
 
     # Feature selection
@@ -353,7 +503,7 @@ class Benchmark:
     def __init__(self, filepath, defmodel, framework, prog=None, desc=None, parser=None):
         """Initialize benchmark object. Object to group common and 
         specific (to benchmark) configuration options.
-        
+
             Parameters
             ----------
             filepath : ./
@@ -370,7 +520,7 @@ class Benchmark:
             parser : argparser (default None)
                 if 'neon' framework a NeonArgparser is passed. Otherwise an argparser is constructed.
         """
-        
+
         if parser is None:
             parser = argparse.ArgumentParser(prog=prog, formatter_class=argparse.ArgumentDefaultsHelpFormatter, description=desc, conflict_handler='resolve')
 
@@ -379,6 +529,9 @@ class Benchmark:
         self.default_model = defmodel
         self.framework = framework
 
+        self.required = set([])
+        self.additional_definitions = []
+        self.set_locals()
 
     def parse_from_common(self):
         """Functionality to parse options common
@@ -401,22 +554,117 @@ class Benchmark:
         parser = get_common_parser(parser)
     
         self.parser = parser
-    
-    
+
+
     def parse_from_benchmark(self):
         """Functionality to parse options specific
            specific for each benchmark.
         """
-        
-        raise NotImplementedError()
-    
+
+        for d in self.additional_definitions:
+            if 'type' not in d:
+                d['type'] = None
+            if 'default' not in d:
+                d['default'] = argparse.SUPPRESS
+            if 'help' not in d:
+                d['help'] = ''
+            if 'action' in d: # Actions
+                if d['action'] == 'list-of-lists': # Non standard. Specific functionallity has been added
+                    d['action'] = ListOfListsAction
+                    self.parser.add_argument('--' + d['name'], dest=d['name'], action=d['action'], type=d['type'], default=d['default'], help=d['help'])
+                elif (d['action'] == 'store_true') or (d['action'] == 'store_false'):
+                    raise Exception ('The usage of store_true or store_false cannot be undone in the command line. Use type=str2bool instead.')
+                else:
+                    self.parser.add_argument('--' + d['name'], action=d['action'], default=d['default'], help=d['help'])
+            else: # Non actions
+                if 'nargs' in d: # variable parameters
+                    if 'choices' in d: # choices with variable parameters
+                        self.parser.add_argument('--' + d['name'], nargs=d['nargs'], choices=d['choices'], default=d['default'], help=d['help'])
+                    else: # Variable parameters (free, no limited choices)
+                        self.parser.add_argument('--' + d['name'], nargs=d['nargs'], type=d['type'], default=d['default'], help=d['help'])
+                elif 'choices' in d: # Select from choice (fixed number of parameters)
+                    self.parser.add_argument('--' + d['name'], choices=d['choices'], default=d['default'], help=d['help'])
+                else: # Non an action, one parameter, no choices
+                    self.parser.add_argument('--' + d['name'], type=d['type'], default=d['default'], help=d['help'])
+
+
+
+    def format_benchmark_config_arguments(self, dictfileparam):
+        """Functionality to format the particular parameters of
+           the benchmark.
+
+            Parameters
+            ----------
+            dictfileparam : python dictionary
+                parameters read from configuration file
+
+        """
+
+        configOut = dictfileparam.copy()
+
+        for d in self.additional_definitions:
+            if d['name'] in configOut.keys():
+                if 'type' in d:
+                    dtype = d['type']
+                else:
+                    dtype = None
+
+                if 'action' in d:
+                    if inspect.isclass(d['action']):
+                        str_read = dictfileparam[d['name']]
+                        configOut[d['name']] = eval_string_as_list_of_lists(str_read, ':', ',', dtype)
+
+        return configOut
+
+
 
     def read_config_file(self, file):
         """Functionality to read the configue file
            specific for each benchmark.
         """
 
-        raise NotImplementedError()
+        config=configparser.ConfigParser()
+        config.read(file)
+        section=config.sections()
+        fileParams={}
+
+        # parse specified arguments (minimal validation: if arguments
+        # are written several times in the file, just the first time
+        # will be used)
+        for sec in section:
+            for k,v in config.items(sec):
+                if not k in fileParams:
+                    fileParams[k] = eval(v)
+
+        fileParams = self.format_benchmark_config_arguments(fileParams)
+        pprint(fileParams)
+
+        return fileParams
+
+
+
+    def set_locals(self):
+        """Functionality to set variables specific for the benchmark
+        - required: set of required parameters for the benchmark.
+        - additional_definitions: list of dictionaries describing the additional parameters for the
+        benchmark.
+        """
+
+        pass
+
+    def check_required_exists(self, gparam):
+        """Functionality to verify that the required
+           model parameters have been specified.
+        """
+
+        key_set = set(gparam.keys())
+        intersect_set = key_set.intersection(self.required)
+        diff_set = self.required.difference(intersect_set)
+
+        if ( len(diff_set) > 0 ):
+            raise Exception('ERROR ! Required parameters are not specified. ' \
+            'These required parameters have not been initialized: ' + str(sorted(diff_set)) + \
+            '... Exiting')
 
 
 
