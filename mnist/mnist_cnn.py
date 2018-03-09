@@ -14,13 +14,13 @@ from keras.layers import Conv2D, MaxPooling2D
 from keras import backend as K
 
 #############################################
-import mnist_benchmark as benchmark
+import common
 import default_utils
 from keras.callbacks import CSVLogger
 from keras import backend as K
 
 def initialize_parameters():
-    mnist_benchmark = benchmark.MNIST(benchmark.file_path,
+    mnist_common = common.MNIST(common.file_path,
         'mnist_default_model.txt',
         'keras',
         prog='mnist_mlp',
@@ -28,7 +28,7 @@ def initialize_parameters():
     )
 
     # Initialize parameters
-    gParameters = default_utils.initialize_parameters(mnist_benchmark)
+    gParameters = default_utils.initialize_parameters(mnist_common)
     csv_logger = CSVLogger('{}/params.log'.format(gParameters))
 
     return gParameters

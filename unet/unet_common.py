@@ -17,10 +17,10 @@ required = ['batch_size', 'epochs']
 
 class UNET(default_utils.Benchmark):
     def set_locals(self):
-    if required is not None:
-        self.required = set(required)
-    if additional_definitions is not None:
-        self.additional_definitions = additional_definitions
+        if required is not None:
+            self.required = set(required)
+        if additional_definitions is not None:
+            self.additional_definitions = additional_definitions
 
 
 def load_data(gParameters):

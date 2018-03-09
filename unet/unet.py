@@ -4,13 +4,13 @@ from keras.optimizers import *
 from keras.callbacks import ModelCheckpoint, LearningRateScheduler
 
 #############################################
-import unet_benchmark as benchmark
+import common
 import default_utils
 from keras.callbacks import CSVLogger
 from keras import backend as K
 
 def initialize_parameters():
-    my_benchmark = benchmark.UNET(benchmark.file_path,
+    my_unet = common.UNET(common.file_path,
         'unet_default_model.txt',
         'keras',
         prog='unet',
@@ -18,14 +18,14 @@ def initialize_parameters():
     )
 
     # Initialize parameters
-    gParameters = default_utils.initialize_parameters(my_benchmark)
+    gParameters = default_utils.initialize_parameters(my_unet)
     csv_logger = CSVLogger('{}/params.log'.format(gParameters))
 
     return gParameters
 
 
 def load_data(gParameters):
-    return benchmark.load_data(gParameters)
+    return common.load_data(gParameters)
 
 def run(gParameters, data):
 
