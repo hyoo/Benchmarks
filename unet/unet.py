@@ -24,10 +24,9 @@ def initialize_parameters():
     return gParameters
 
 
-def load_data(gParameters):
-    return common.load_data(gParameters)
+def run(gParameters):
 
-def run(gParameters, data):
+    data = common.load_data(gParameters)
 
     #############################################
     model = get_model(512, 512)
@@ -35,12 +34,14 @@ def run(gParameters, data):
 
     # train
     model_checkpoint = ModelCheckpoint('unet.hdf5', monitor='loss', verbose=1, save_best_only=True)
-    model.fit(imgs_train, imgs_mask_train, batch_size=gParameters['batch_size'], epochs=gParameters['epochs'], verbose=1, validation_split=0.2,
+    history = model.fit(imgs_train, imgs_mask_train, batch_size=gParameters['batch_size'], epochs=gParameters['epochs'], verbose=1, validation_split=0.2,
         shuffle=True, callbacks=[model_checkpoint])
 
     # predict & save result in npy format
-    imgs_mask_test = model.predict(imgs_test, batch_size=1, verbose=1)
-    np.save(gParameters['test_mask_data'], imgs_mask_test)
+    # imgs_mask_test = model.predict(imgs_test, batch_size=1, verbose=1)
+    # np.save(gParameters['test_mask_data'], imgs_mask_test)
+
+    return history
 
 
 def get_model(img_rows, img_cols):
@@ -104,8 +105,7 @@ def get_model(img_rows, img_cols):
 #############################################
 def main():
     gParameters = initialize_parameters()
-    data = load_data(gParameters)
-    run(gParameters, data)
+    run(gParameters)
 
 if __name__ == '__main__':
     main()
