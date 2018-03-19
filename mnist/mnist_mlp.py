@@ -33,15 +33,14 @@ def initialize_parameters():
 
     return gParameters
 
-
-def load_data(gParameters):
-    return mnist.load_data()
-
-def run(gParameters, data):
+def run(gParameters):
 
     batch_size = gParameters['batch_size']
     num_classes = 10
     epochs = gParameters['epochs']
+    activation = gParameters['activation']
+    optimizer = gParameters['optimizer']
+    data = mnist.load_data()
 
     #############################################
     # the data, split between train and test sets
@@ -61,16 +60,16 @@ def run(gParameters, data):
     y_test = keras.utils.to_categorical(y_test, num_classes)
 
     model = Sequential()
-    model.add(Dense(512, activation='relu', input_shape=(784,)))
+    model.add(Dense(512, activation=activation, input_shape=(784,)))
     model.add(Dropout(0.2))
-    model.add(Dense(512, activation='relu'))
+    model.add(Dense(512, activation=activation))
     model.add(Dropout(0.2))
     model.add(Dense(num_classes, activation='softmax'))
 
     model.summary()
 
     model.compile(loss='categorical_crossentropy',
-                optimizer=RMSprop(),
+                optimizer=optimizer,
                 metrics=['accuracy'])
 
     history = model.fit(x_train, y_train,
@@ -82,12 +81,12 @@ def run(gParameters, data):
     print('Test loss:', score[0])
     print('Test accuracy:', score[1])
     #############################################
+    return history
 
 def main():
 
     gParameters = initialize_parameters()
-    data = load_data(gParameters)
-    run(gParameters, data)
+    run(gParameters)
 
 if __name__ == '__main__':
     main()

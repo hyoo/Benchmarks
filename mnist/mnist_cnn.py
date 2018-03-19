@@ -33,15 +33,15 @@ def initialize_parameters():
 
     return gParameters
 
-
-def load_data(gParameters):
-    return mnist.load_data()
-
-def run(gParameters, data):
+def run(gParameters):
 
     batch_size = gParameters['batch_size']
     num_classes = 10
     epochs = gParameters['epochs']
+    activation = gParameters['activation']
+    optimizer = gParameters['optimizer']
+    data = mnist.load_data()
+
 
     #############################################
     # input image dimensions
@@ -87,7 +87,7 @@ def run(gParameters, data):
                 optimizer=keras.optimizers.Adadelta(),
                 metrics=['accuracy'])
 
-    model.fit(x_train, y_train,
+    history = model.fit(x_train, y_train,
             batch_size=batch_size,
             epochs=epochs,
             verbose=1,
@@ -96,12 +96,12 @@ def run(gParameters, data):
     print('Test loss:', score[0])
     print('Test accuracy:', score[1])
     #############################################
+    return history
 
 def main():
 
     gParameters = initialize_parameters()
-    data = load_data(gParameters)
-    run(gParameters, data)
+    run(gParameters)
 
 if __name__ == '__main__':
     main()
