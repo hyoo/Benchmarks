@@ -1,8 +1,7 @@
 [Global_Params]
 model_name = 'unet'
 train_data = 'data/imgs_train.npy'
-train_label_data = 'data/imgs_train_mask.npy'
+train_label_data = 'data/imgs_mask_train.npy'
 test_data = 'data/imgs_test.npy'
-test_label_data = 'data/imgs_test_mask.npy'
 epochs = 10
 batch_size = 4
