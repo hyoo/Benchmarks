@@ -169,7 +169,16 @@ def initialize_parameters():
 def run(args):
 
     get_custom_objects()['PermanentDropout'] = PermanentDropout
-    model = keras.models.load_model(args['model_file'])
+
+    model_ext = os.path.splitext(args['model_file'])[-1].lower()
+    if model_ext == '.json':
+        from keras.models import model_from_json
+        json_file = open(args['model_file'], 'r')
+        json_string = json_file.read()
+        json_file.close()
+        model = model_from_json(json_string)
+    else:
+        model = keras.models.load_model(args['model_file'])
     model.load_weights(args['weights_file'])
     # model.summary()
 
