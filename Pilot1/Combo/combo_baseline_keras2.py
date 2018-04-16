@@ -40,7 +40,6 @@ from solr_keras import CandleRemoteMonitor, compute_trainable_params, TerminateO
 # from datasets import NCI60
 
 import NCI60
-import combo
 
 
 logger = logging.getLogger(__name__)
@@ -649,24 +648,15 @@ def build_model(loader, args, verbose=False):
 
 
 
-def get_combo_parser():
-    description = 'Build neural network based models to predict tumor response to drug pairs.'
-    parser = argparse.ArgumentParser(prog='combo_baseline', formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                     description=description)
-    return combo.common_parser(parser)
-
-
 def initialize_parameters():
-    # Get command-line parameters
-    parser = get_combo_parser()
-    args = parser.parse_args()
-    # Get parameters from configuration file
-    file_params = combo.read_config_file(args.config_file)
-    # Consolidate parameter set. Command-line parameters overwrite file configuration
-    params = p1_common.args_overwrite_config(args, file_params)
-    # print(params)
-    return params
-
+    combo_class = combo.Combo(combo.file_path,
+        'combo_default_model.txt',
+        'keras',
+        prog='combo_baseline',
+        desc='Build neural network based models to predict tumor response to drug pairs.'
+    )
+    gParameters = combo.default_utils.initialize_parameters(combo_class)
+    return gParameters
 
 class Struct:
     def __init__(self, **entries):

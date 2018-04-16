@@ -40,7 +40,6 @@ from solr_keras import CandleRemoteMonitor, compute_trainable_params, TerminateO
 # from datasets import NCI60
 
 import NCI60
-import combo
 
 
 logger = logging.getLogger(__name__)
@@ -141,6 +140,7 @@ class ComboDataLoader(object):
     def __init__(self, seed, val_split=0.2, shuffle=True,
                  cell_features=['expression'], drug_features=['descriptors'],
                  use_landmark_genes=False, use_combo_score=False,
+                 exclude_cells=[], exclude_drugs=[],
                  feature_subsample=None, scaling='std', scramble=False,
                  cv_partition='overlapping', cv=0):
         """Initialize data merging drug response, drug descriptors and cell line essay.
@@ -665,15 +665,14 @@ def get_combo_parser():
 
 
 def initialize_parameters():
-    # Get command-line parameters
-    parser = get_combo_parser()
-    args = parser.parse_args()
-    # Get parameters from configuration file
-    file_params = combo.read_config_file(args.config_file)
-    # Consolidate parameter set. Command-line parameters overwrite file configuration
-    params = p1_common.args_overwrite_config(args, file_params)
-    # print(params)
-    return params
+    combo_class = combo.Combo(combo.file_path,
+        'combo_default_model.txt',
+        'keras',
+        prog='combo_baseline',
+        desc='Build neural network based models to predict tumor response to drug pairs.'
+    )
+    gParameters = combo.default_utils.initialize_parameters(combo_class)
+    return gParameters
 
 
 class Struct:
