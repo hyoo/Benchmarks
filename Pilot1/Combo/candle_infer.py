@@ -103,17 +103,17 @@ def prepare_data(sample_set='NCI60', drug_set='ALMANAC', use_landmark_genes=Fals
 def initialize_parameters():
     from default_utils import str2bool
     additional_definitions = [
-        {'name':'sample_set', 'default':'NCIPDM'},
-        {'name':'drug_set', 'default':'ALAMANAC'},
-        {'name':'batch_size', 'type':int, 'default': 100000},
-        {'name':'step', 'type':int, 'default': 10000},
-        {'name':'model_file', 'default':'saved.model.h5'},
-        {'name':'n_pred', 'type':int, 'default':1},
-        {'name':'weights_file', 'default':'saved.weights.h5'},
-        {'name':'ns', 'type':int, 'default':0},
-        {'name':'nd', 'type':int, 'default':0},
-        {'name':'si', 'type':int, 'default':0},
-        {'name':'use_landmark_genes', 'type':str2bool, 'default':'False'}
+        {'name':'sample_set', 'default':'NCIPDM', 'help':'cell sample set: NCI60, NCIPDM, GDSC, ...'},
+        {'name':'drug_set', 'default':'ALMANAC', 'help':'drug set: ALMANAC, GDSC, NCI_IOA_AOA, ...'},
+        {'name':'batch_size', 'type':int, 'default': 100000, 'help':'batch size'},
+        {'name':'step', 'type':int, 'default': 10000, 'help':'number of rows to inter in each step'},
+        {'name':'model_file', 'default':'saved.model.h5', 'help':'trained model file'},
+        {'name':'n_pred', 'type':int, 'default':1, 'help':'the number of predictions to make for each sample-drug combination for uncertainty quantification'},
+        {'name':'weights_file', 'default':'saved.weights.h5', 'help':'trained weights file (loading model file alone sometimes does not work in keras)'},
+        {'name':'ns', 'type':int, 'default':0, 'help':'the first n entries of cell samples to subsample'},
+        {'name':'nd', 'type':int, 'default':0, 'help':'the first n entries of drugs to subsample'},
+        {'name':'si', 'type':int, 'default':0, 'help':'the index of the first cell sample to subsample'},
+        {'name':'use_landmark_genes', 'type':str2bool, 'default':'False', 'help':'use the 978 landmark genes from LINCS (L1000) as expression features'}
     ]
     class ComboInfer(default_utils.Benchmark):
         def set_locals(self):
