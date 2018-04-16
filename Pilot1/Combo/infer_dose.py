@@ -18,6 +18,27 @@ import NCI60
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+import sys
+file_path = os.path.dirname(os.path.realpath("__file__"))
+lib_path = os.path.abspath(os.path.join(file_path, '..', '..', 'common'))
+sys.path.append(lib_path)
+import default_utils
+
+if K.backend() == 'tensorflow' and 'NUM_INTRA_THREADS' in os.environ:
+    import tensorflow as tf
+    session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+    sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+    K.set_session(sess)
+
+    # Uncommit when running on an optimized tensorflow where NUM_INTER_THREADS and
+    # NUM_INTRA_THREADS env vars are set.
+    print('NUM_INTER_THREADS: ', os.environ['NUM_INTER_THREADS'])
+    print('NUM_INTRA_THREADS: ', os.environ['NUM_INTRA_THREADS'])
+    session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
+          intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
+    sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+    K.set_session(sess)
+
 
 class PermanentDropout(keras.layers.Dropout):
     def __init__(self, rate, **kwargs):
@@ -30,51 +51,6 @@ class PermanentDropout(keras.layers.Dropout):
             x = K.dropout(x, self.rate, noise_shape)
         return x
 
-
-def get_parser(description=None):
-    parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('-s', '--sample_set',
-                        default='NCIPDM',
-                        help='cell sample set: NCI60, NCIPDM, GDSC, ...')
-    parser.add_argument('-d', '--drug_set',
-                        default='ALMANAC',
-                        help='drug set: ALMANAC, GDSC, NCI_IOA_AOA, ...')
-    parser.add_argument('-z', '--batch_size', type=int,
-                        default=100000,
-                        help='batch size')
-    parser.add_argument('--step', type=int,
-                        default=10000,
-                        help='number of rows to inter in each step')
-    parser.add_argument('-m', '--model_file',
-                        default='saved.model.h5',
-                        help='trained model file')
-    parser.add_argument('-n', '--n_pred', type=int,
-                        default=1,
-                        help='the number of predictions to make for each sample-drug combination for uncertainty quantification')
-    parser.add_argument('-w', '--weights_file',
-                        default='saved.weights.h5',
-                        help='trained weights file (loading model file alone sometimes does not work in keras)')
-    parser.add_argument('--ns', type=int,
-                        default=0,
-                        help='the first n entries of cell samples to subsample')
-    parser.add_argument('--nd', type=int,
-                        default=0,
-                        help='the first n entries of drugs to subsample')
-    parser.add_argument("--use_landmark_genes", action="store_true",
-                        help="use the 978 landmark genes from LINCS (L1000) as expression features")
-    parser.add_argument("--skip_single_prediction_cleanup", action="store_true",
-                        help="skip removing single drug predictions with two different concentrations")
-    parser.add_argument('--min_pconc', type=float,
-                        default=4.0,
-                        help='min negative common log concentration of drugs')
-    parser.add_argument('--max_pconc', type=float,
-                        default=6.0,
-                        help='max negative common log concentration of drugs')
-    parser.add_argument('--pconc_step', type=float,
-                        default=1.0,
-                        help='concentration step size')
-
-    return parser
 
 
 def lookup(df, sample, drug1, drug2=None, value=None):
@@ -124,11 +100,41 @@ def prepare_data(sample_set='NCI60', drug_set='ALMANAC', use_landmark_genes=Fals
     df_desc = NCI60.load_drug_set_descriptors(drug_set=drug_set)
     return df_expr, df_desc
 
+def initialize_parameters():
+    from default_utils import str2bool
+    additional_definitions = [
+        {'name':'sample_set', 'default':'NCIPDM', 'help':'cell sample set: NCI60, NCIPDM, GDSC, ...'},
+        {'name':'drug_set', 'default':'ALMANAC', 'help':'drug set: ALMANAC, GDSC, NCI_IOA_AOA, ...'},
+        {'name':'batch_size', 'type':int, 'default': 100000, 'help':'batch size'},
+        {'name':'step', 'type':int, 'default': 10000, 'help':'number of rows to inter in each step'},
+        {'name':'model_file', 'default':'saved.model.h5', 'help':'trained model file'},
+        {'name':'n_pred', 'type':int, 'default':1, 'help':'the number of predictions to make for each sample-drug combination for uncertainty quantification'},
+        {'name':'weights_file', 'default':'saved.weights.h5', 'help':'trained weights file (loading model file alone sometimes does not work in keras)'},
+        {'name':'ns', 'type':int, 'default':0, 'help':'the first n entries of cell samples to subsample'},
+        {'name':'nd', 'type':int, 'default':0, 'help':'the first n entries of drugs to subsample'},
+        {'name':'si', 'type':int, 'default':0, 'help':'the index of the first cell sample to subsample'},
+        {'name':'use_landmark_genes', 'type':str2bool, 'default':'False', 'help':'use the 978 landmark genes from LINCS (L1000) as expression features'},
+        {'name':'skip_single_prediction_cleanup', 'type':str2bool, 'default':'False'},
+        {'name':'min_pconc', 'type':float, 'default':4.0, 'help': 'min negative common log concentration of drugs'},
+        {'name':'max_pconc', 'type':float, 'default':6.0, 'help': 'max negative common log concentration of drugs'},
+        {'name':'pconc_step', 'type':float, 'default':1.0, 'help': 'concentration step size'}
+    ]
+    class ComboInfer(default_utils.Benchmark):
+        def set_locals(self):
+            self.additional_definitions = additional_definitions
 
-def main():
-    description = 'Infer drug pair response from trained combo model.'
-    parser = get_parser(description)
-    args = parser.parse_args()
+    combo_infer = ComboInfer(file_path, '', 'keras', prog='combo_infer_dose', desc='Combo Infer Dose')
+    gParameters = default_utils.initialize_parameters(combo_infer)
+    return gParameters
+
+
+class Struct:
+    def __init__(self, **entries):
+        self.__dict__.update(entries)
+
+
+def run(params):
+    args = Struct(**params)
 
     get_custom_objects()['PermanentDropout'] = PermanentDropout
     model = keras.models.load_model(args.model_file, compile=False)
@@ -209,6 +215,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    gParameters = initialize_parameters()
+    run(gParameters)
     if K.backend() == 'tensorflow':
         K.clear_session()
