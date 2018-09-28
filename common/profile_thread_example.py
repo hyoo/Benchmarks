@@ -11,17 +11,39 @@ import psutil
 import threading
 import time
 
+import logging
+logger = logging.getLogger('cpuutil')
+file_handler = logging.FileHandler('cpuutil.log', mode='w')
+# file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+logger.setLevel(logging.DEBUG)
+
+
+
+import datetime
+
 class Sleeper(threading.Thread):
     def __init__(self, sleep=5.0):
         threading.Thread.__init__(self, name='Sleeper')
         self.stop_event = threading.Event()
         self.sleep = sleep
 
+
+        # logging.basicConfig(filename="cpuutil.log", level=logging.INFO)
+
+
     def run(self):
         print('Thread {thread} started'.format(thread=threading.current_thread()))
         cpu_percents = []
+
         while not self.stop_event.is_set():
-            cpu_percents.append(1)
+            cpu_percent = psutil.cpu_percent()
+            mem = psutil.virtual_memory()
+            # print(datetime.datetime.now(), '|', cpu_percent, '|', mem)
+            aa = "".join([str(datetime.datetime.now()), '|', str(cpu_percent), '|', str(mem)])
+            logger.info(aa)
+            #
+            # cpu_percents.append(aa)
             print('thread is running')
             time.sleep(5)
         print('Thread {thread} ended'.format(thread=threading.current_thread()))
