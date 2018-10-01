@@ -16,9 +16,9 @@ file_handler = logging.FileHandler('cpuutil.log', mode='w')
 logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG)
 
-def gpu_start_2():
-    command_string = "nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > output_file.csv"
-    os.system(command_string)
+# def gpu_start_2():
+#     command_string = "nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > output_file.csv"
+#     os.system(command_string)
 
 import datetime
 
@@ -35,18 +35,14 @@ class GPUMonitorThread(threading.Thread):
 
 
     def stop(self):
+        # the problem with this right now is that the pid that is being terminated is pid -1 to the pid we need
         self.proc_id.terminate()
 
 
-class Sleeper(threading.Thread):
-    def __init__(self, sleep=5.0):
-        threading.Thread.__init__(self, name='Sleeper')
+class CPUPoll(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self, name='CPUPoll')
         self.stop_event = threading.Event()
-        self.sleep = sleep
-
-
-        # logging.basicConfig(filename="cpuutil.log", level=logging.INFO)
-
 
     def run(self):
         print('Thread {thread} started'.format(thread=threading.current_thread()))
@@ -59,12 +55,13 @@ class Sleeper(threading.Thread):
         while not self.stop_event.is_set():
             cpu_percent = psutil.cpu_percent()
             mem = psutil.virtual_memory()
-            # print(datetime.datetime.now(), '|', cpu_percent, '|', mem)
+
+            # this data is simply written to a log file
             aa = "".join([str(datetime.datetime.now()), '|', str(cpu_percent), '|', str(mem)])
             logger.info(aa)
             #
             # cpu_percents.append(aa)
-            print('thread is running')
+            # print('thread is running')
             time.sleep(5)
         mt.stop()
         print('Thread {thread} ended'.format(thread=threading.current_thread()))
@@ -78,7 +75,7 @@ class Sleeper(threading.Thread):
 
     def __exit__(self, *args, **kwargs):
         self.stop()
-        print('Force set Thread Sleeper stop_event')
+        print('Force set Thread CPUPoll stop_event')
 
 
 
@@ -91,9 +88,10 @@ def test_profile(f):
         if not os.path.isdir('tmp2'):
             os.mkdir('tmp2')
 
+        # where I was initially entering tf's profileContext
         # with ProfileContext('tmp2/') as pctx:
         #     return f(*args, **kwds)
 
-        with Sleeper(sleep=2.0) as sleeper:
+        with CPUPoll() as cpu_poll:
             return f(*args, **kwds)
     return decorated
