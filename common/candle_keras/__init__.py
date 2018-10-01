@@ -33,3 +33,4 @@ from generic_utils import LoggingCallback
 
 from solr_keras import CandleRemoteMonitor, compute_trainable_params, TerminateOnTimeOut
 
+from profile_thread_example import test_profile
