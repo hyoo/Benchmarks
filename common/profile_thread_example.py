@@ -25,10 +25,17 @@ import datetime
 class GPUMonitorThread(threading.Thread):
     def __init__(self):
         threading.Thread.__init__(self)
+        self.proc_id = None
 
     def run(self):
-        gpu_start_2()
+        # gpu_start_2()
+        self.proc_id = subprocess.Popen(
+            ["nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > output_file.csv"],
+            shell=True)
 
+
+    def stop(self):
+        self.proc_id.terminate()
 
 
 class Sleeper(threading.Thread):
@@ -59,6 +66,7 @@ class Sleeper(threading.Thread):
             # cpu_percents.append(aa)
             print('thread is running')
             time.sleep(5)
+        mt.stop()
         print('Thread {thread} ended'.format(thread=threading.current_thread()))
 
     def stop(self):
