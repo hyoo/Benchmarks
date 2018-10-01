@@ -1,12 +1,10 @@
-# import tensorflow as tf
-from tensorflow.contrib.tfprof import ProfileContext
-
 import functools
 import os
 import inspect
 
 import multiprocessing as mp
 import psutil
+import subprocess
 
 import threading
 import time
@@ -18,9 +16,20 @@ file_handler = logging.FileHandler('cpuutil.log', mode='w')
 logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG)
 
-
+def gpu_start_2():
+    command_string = "nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > output_file.csv"
+    os.system(command_string)
 
 import datetime
+
+class GPUMonitorThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        gpu_start_2()
+
+
 
 class Sleeper(threading.Thread):
     def __init__(self, sleep=5.0):
@@ -34,7 +43,11 @@ class Sleeper(threading.Thread):
 
     def run(self):
         print('Thread {thread} started'.format(thread=threading.current_thread()))
-        cpu_percents = []
+
+        # cpu_percents = []
+        mt = GPUMonitorThread()
+        mt.daemon = True
+        mt.start()
 
         while not self.stop_event.is_set():
             cpu_percent = psutil.cpu_percent()
@@ -59,15 +72,6 @@ class Sleeper(threading.Thread):
         self.stop()
         print('Force set Thread Sleeper stop_event')
 
-# def cpu_percents():
-#     cpu_percents = []
-#     while worker_process.is_alive():
-#         cpu_percents.append(p.cpu_percent())
-#         time.sleep(0.01)
-#
-# def monitor(target):
-#     worker_process = mp.Process(target=target)
-#     worker_process.start()
 
 
 def test_profile(f):
