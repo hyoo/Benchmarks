@@ -40,17 +40,19 @@ class GPUMonitorThread(threading.Thread):
 
 
 class CPUPoll(threading.Thread):
-    def __init__(self):
+    def __init__(self, prof_gpu):
         threading.Thread.__init__(self, name='CPUPoll')
         self.stop_event = threading.Event()
+        self.prof_gpu = prof_gpu
 
     def run(self):
         print('Thread {thread} started'.format(thread=threading.current_thread()))
 
         # cpu_percents = []
-        mt = GPUMonitorThread()
-        mt.daemon = True
-        mt.start()
+        if self.prof_gpu:
+            mt = GPUMonitorThread()
+            mt.daemon = True
+            mt.start()
 
         while not self.stop_event.is_set():
             cpu_percent = psutil.cpu_percent()
@@ -63,7 +65,10 @@ class CPUPoll(threading.Thread):
             # cpu_percents.append(aa)
             # print('thread is running')
             time.sleep(5)
-        mt.stop()
+
+        if self.prof_gpu:
+            mt.stop()
+
         print('Thread {thread} ended'.format(thread=threading.current_thread()))
 
     def stop(self):
@@ -88,10 +93,16 @@ def test_profile(f):
         if not os.path.isdir('tmp2'):
             os.mkdir('tmp2')
 
+        input_dict = args[0]
+        prof_gpu = True
+        if 'no_gpu_prof' in input_dict.keys():
+            if input_dict['no_gpu_prof'] is True:
+                prof_gpu = False
+
         # where I was initially entering tf's profileContext
         # with ProfileContext('tmp2/') as pctx:
         #     return f(*args, **kwds)
 
-        with CPUPoll() as cpu_poll:
+        with CPUPoll(prof_gpu) as cpu_poll:
             return f(*args, **kwds)
     return decorated

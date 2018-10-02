@@ -141,6 +141,7 @@ def load_cache(cache_file):
     return x_train, y_train, x_val, y_val, x_test, y_test, x_labels, y_labels
 
 
+@candle.test_profile
 def run(params):
 
     args = candle.ArgumentStruct(**params)
