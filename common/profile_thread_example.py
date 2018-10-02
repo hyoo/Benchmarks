@@ -105,11 +105,22 @@ def test_profile(f):
         if not os.path.isdir('tmp2'):
             os.mkdir('tmp2')
 
+        # could also get the param from the command line
         input_dict = args[0]
         prof_gpu = True
         if 'no_gpu_prof' in input_dict.keys():
             if input_dict['no_gpu_prof'] is True:
                 prof_gpu = False
+
+        # also act as a which check, to avoid a command line param
+        cmd = ["which", "nvidia-smi"]
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        res = p.stdout.readlines()
+        prof_gpu = False
+        if len(res) > 0:
+            print("mvidia-smi is there")
+            prof_gpu = True
+
 
         # where I was initially entering tf's profileContext
         # with ProfileContext('tmp2/') as pctx:
