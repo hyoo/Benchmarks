@@ -8,6 +8,8 @@ import subprocess
 
 import threading
 import time
+import signal
+
 
 import logging
 logger = logging.getLogger('cpuutil')
@@ -37,6 +39,16 @@ class GPUMonitorThread(threading.Thread):
     def stop(self):
         # the problem with this right now is that the pid that is being terminated is pid -1 to the pid we need
         self.proc_id.terminate()
+
+        p = subprocess.Popen(['ps', '-A'], stdout=subprocess.PIPE)
+        out, err = p.communicate()
+        for line in out.splitlines():
+            if 'nvidia-smi' in line:
+                print(line)
+                print('found nvidia-smi and am attempting to kill')
+                pid = int(line.split(None, 1)[0])
+                os.kill(pid, signal.SIGKILL)
+
 
 
 class CPUPoll(threading.Thread):
