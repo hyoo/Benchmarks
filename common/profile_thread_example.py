@@ -46,7 +46,7 @@ class GPUMonitorThread(threading.Thread):
             if 'nvidia-smi' in str(line):
                 print(str(line))
                 print('found nvidia-smi and am attempting to kill')
-                pid = int(str(line).split()[0])
+                pid = int(str(line).split()[1])
                 os.kill(pid, signal.SIGKILL)
 
 
@@ -55,6 +55,7 @@ class CPUPoll(threading.Thread):
     def __init__(self, prof_gpu):
         threading.Thread.__init__(self, name='CPUPoll')
         self.stop_event = threading.Event()
+        print('the value of prof_gpu is {}'.format(prof_gpu))
         self.prof_gpu = prof_gpu
 
     def run(self):
