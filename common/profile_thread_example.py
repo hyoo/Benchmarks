@@ -46,7 +46,7 @@ class GPUMonitorThread(threading.Thread):
             if 'nvidia-smi' in str(line):
                 print(str(line))
                 print('found nvidia-smi and am attempting to kill')
-                pid = int(line.split(1)[0])
+                pid = int(str(line).split(1)[0])
                 os.kill(pid, signal.SIGKILL)
 
 
@@ -116,9 +116,10 @@ def test_profile(f):
         cmd = ["which", "nvidia-smi"]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         res = p.stdout.readlines()
+        print(res)
         prof_gpu = False
         if len(res) > 0:
-            print("mvidia-smi is there")
+            print("nvidia-smi is there")
             prof_gpu = True
 
 
