@@ -18,9 +18,6 @@ file_handler = logging.FileHandler('cpuutil.log', mode='w')
 logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG)
 
-# def gpu_start_2():
-#     command_string = "nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > output_file.csv"
-#     os.system(command_string)
 
 import datetime
 
@@ -30,16 +27,17 @@ class GPUMonitorThread(threading.Thread):
         self.proc_id = None
 
     def run(self):
-        # gpu_start_2()
+
         self.proc_id = subprocess.Popen(
             ["nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > output_file.csv"],
             shell=True)
 
 
     def stop(self):
-        # the problem with this right now is that the pid that is being terminated is pid -1 to the pid we need
+        # terminate the spawned proc
         self.proc_id.terminate()
 
+        # still have to go and kill the nvidia-smi command, bc it is still logging
         p = subprocess.Popen(['ps', '-aux'], stdout=subprocess.PIPE)
         out, err = p.communicate()
         for line in out.splitlines():
@@ -61,7 +59,7 @@ class CPUPoll(threading.Thread):
     def run(self):
         print('Thread {thread} started'.format(thread=threading.current_thread()))
 
-        # cpu_percents = []
+
         if self.prof_gpu:
             mt = GPUMonitorThread()
             mt.daemon = True
@@ -71,12 +69,9 @@ class CPUPoll(threading.Thread):
             cpu_percent = psutil.cpu_percent()
             mem = psutil.virtual_memory()
 
-            # this data is simply written to a log file
+            # this data, cpu_percent and virtual memory, is written to a log file every 5 seconds
             aa = "".join([str(datetime.datetime.now()), '|', str(cpu_percent), '|', str(mem)])
             logger.info(aa)
-            #
-            # cpu_percents.append(aa)
-            # print('thread is running')
             time.sleep(5)
 
         if self.prof_gpu:
@@ -96,7 +91,6 @@ class CPUPoll(threading.Thread):
         print('Force set Thread CPUPoll stop_event')
 
 
-
 def test_profile(f):
     @functools.wraps(f)
     def decorated(*args, **kwds):
@@ -113,7 +107,7 @@ def test_profile(f):
             if input_dict['no_gpu_prof'] is True:
                 prof_gpu = False
 
-        # also act as a which check, to avoid a command line param
+        # also can call 'which nvidia-smi' to see if it available
         cmd = ["which", "nvidia-smi"]
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
         res = p.stdout.readlines()
