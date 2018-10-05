@@ -15,14 +15,15 @@ import datetime
 
 class GPUMonitorThread(threading.Thread):
 
-    def __init__(self):
+    def __init__(self, output_dir):
         threading.Thread.__init__(self)
         self.proc_id = None
+        self.output_dir = output_dir
 
     def run(self):
-
+        save_path = os.path.join(self.output_dir, 'profile.gpu.csv')
         self.proc_id = subprocess.Popen(
-            ["nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > profile.gpu.csv"],
+            ["nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > {}".format(save_path)],
             shell=True)
 
 
@@ -62,7 +63,7 @@ class CPUPoll(threading.Thread):
         print('Thread {thread} started'.format(thread=threading.current_thread()))
 
         if self.prof_gpu:
-            mt = GPUMonitorThread()
+            mt = GPUMonitorThread(self.output_dir)
             mt.daemon = True
             mt.start()
 
@@ -100,10 +101,7 @@ def run_profile(f):
     @functools.wraps(f)
     def decorated(*args, **kwds):
 
-        print(inspect.getmodule(f).__file__)
-
-        if not os.path.isdir('tmp2'):
-            os.mkdir('tmp2')
+        # print(inspect.getmodule(f).__file__)
 
         # args[0] contains the overall run parameters
         output_dir = ''
@@ -141,6 +139,7 @@ if __name__ == '__main__':
     # dummy({})
 
     # True for gpu profiling, and output dir second path
+
     t = CPUPoll(True, '')
     t.start()
     time.sleep(10)
