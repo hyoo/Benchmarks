@@ -1,7 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 
-path = '/Users/dcarron/Documents/cpu_sample.txt'
+path = '/Users/dcarron/Documents/cpu_out_wash.txt'
 
 with open(path) as file:
     lines = file.readlines()
