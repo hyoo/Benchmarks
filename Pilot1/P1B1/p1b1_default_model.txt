@@ -24,7 +24,6 @@ feature_subsample=0
 batch_normalization=False
 alpha_dropout=False
 save='save'
-no_gpu_prof=True
 
 [Monitor_Params]
 solr_root=''
