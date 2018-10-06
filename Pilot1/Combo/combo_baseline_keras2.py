@@ -657,6 +657,7 @@ class Struct:
         self.__dict__.update(entries)
 
 
+@candle.run_profile
 def run(params):
     args = Struct(**params)
     set_seed(args.rng_seed)

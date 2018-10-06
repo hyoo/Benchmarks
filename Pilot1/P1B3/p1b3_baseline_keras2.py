@@ -203,6 +203,8 @@ def add_conv_layer(model, layer_params, input_dim=None, locally_connected=False)
                 model.add(Conv2D(filters, filter_len, strides=stride))
     return model
 
+
+@candle.run_profile
 def run(gParameters):
     """
     Runs the model using the specified set of parameters
