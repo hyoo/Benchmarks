@@ -1,0 +1,96 @@
+# Setup
+1. Clone Benchmarks repo
+```
+git clone -b release_01 https://github.com/ECP-CANDLE/Benchmarks.git
+```
+
+2. Data directory
+```
+cd Benchmarks
+ln -s /projects/CSC249ADOA01/hsyoo/BenchmarksData/ Data
+```
+
+3. install third party modules
+```
+mkdir pylibs
+pip install --install-option="--prefix=./pylibs" psutil
+pip install --install-option="--prefix=./pylibs" --ignore-installed scikit-learn
+pip install --install-option="--prefix=./pylibs" --ignore-installed pandas
+```
+
+
+# Running Benchmarks
+Save code below `submit_jobs.sh` and make the script executable.
+
+
+```
+#!/bin/bash
+#COBALT -n 128
+#COBALT -t 03:00:00
+#COBALT -q default
+#COBALT --attrs mcdram=cache:numa=quad
+#COBALT -A CSC249ADOA01
+
+set -x
+
+unset PYTHONPATH
+unset LD_LIBRARY_PATH
+
+module load datascience/tensorflow-1.10
+module load datascience/keras-2.2.2
+
+export KMP_BLOCKTIME=0
+export KMP_SETTINGS=1
+export KMP_AFFINITY="granularity=fine,verbose,compact,1,0"
+export NUM_INTER_THREADS=1
+export NUM_INTRA_THREADS=128
+export OMP_NUM_THREADS=128
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# for custom deps
+export PYTHONPATH=$PYTHONPATH:$DIR/pylibs/lib/python3.5/site-packages/
+
+result_dir=$(date +"results_%Y%m%d.%H%M%S")
+mkdir -p $result_dir
+
+echo "Check Env"
+aprun -n 1 -N 1 -cc none -b python3 $DIR/env.py > "$result_dir/env.std.out" &
+sleep 1
+
+echo "Starting p1b1"
+mkdir -p "$result_dir/p1b1/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/P1B1/p1b1_baseline_keras2.py --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
+sleep 1
+
+echo "Starting p1b2"
+mkdir -p "$result_dir/p1b2/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/P1B2/p1b2_baseline_keras2.py --output_dir "$result_dir/p1b2/" > "$result_dir/p1b2/std.out" &
+sleep 1
+
+echo "Starting p1b3"
+mkdir -p "$result_dir/p1b3/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/P1B3/p1b3_baseline_keras2.py --conf $DIR/Pilot1/P1B3/p1b3_perf_bench_model.txt --output_dir "$result_dir/p1b3/" > "$result_dir/p1b3/std.out" &
+sleep 1
+
+#skip tc1, nt3 since MKL-DNN doesn't support conv1d
+#echo "Starting tc1"
+#aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/TC1/tc1_baseline_keras2.py -l false -e 1 > "$result_dir/tc1.out" &
+#sleep 1
+
+#echo "Starting nt3"
+#aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/NT3/nt3_baseline_keras2.py -l false -e 3 > "$result_dir/nt3.out" &
+#sleep 1
+
+echo "Starting uno"
+mkdir -p "$result_dir/uno/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/Uno/uno_baseline_keras2.py --conf $DIR/Pilot1/Uno/uno_perf_bench_model.txt -e 1 --output_dir "$result_dir/uno/" > "$result_dir/uno/std.out" &
+sleep 1
+
+
+echo "Starting combo"
+mkdir -p "$result_dir/combo/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/Combo/combo_baseline_keras2.py --conf $DIR/Pilot1/Combo/combo_perf_bench_model.txt -e 1 --output_dir "$result_dir/combo/" > "$result_dir/combo/std.out" &
+wait
+
+```
