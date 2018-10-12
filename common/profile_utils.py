@@ -11,6 +11,11 @@ import time
 import signal
 
 import datetime
+import pandas
+
+
+def p2f(x):
+    return float(x.strip('%'))
 
 
 class GPUMonitorThread(threading.Thread):
@@ -19,13 +24,14 @@ class GPUMonitorThread(threading.Thread):
         threading.Thread.__init__(self)
         self.proc_id = None
         self.output_dir = output_dir
+        self.file_path = os.path.join(self.output_dir, 'profile.gpu.csv')
 
     def run(self):
-        save_path = os.path.join(self.output_dir, 'profile.gpu.csv')
+        # save_path = os.path.join(self.output_dir, 'profile.gpu.csv')
         self.proc_id = subprocess.Popen(
-            ["nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory --format=csv -i 0 -l 1 > {}".format(save_path)],
+            ["nvidia-smi --query-gpu=index,timestamp,utilization.gpu,utilization.memory --format=csv -l 1 > {}".format(
+                self.file_path)],
             shell=True)
-
 
     def stop(self):
         # terminate the spawned proc
@@ -35,11 +41,16 @@ class GPUMonitorThread(threading.Thread):
         p = subprocess.Popen(['ps', '-aux'], stdout=subprocess.PIPE)
         out, err = p.communicate()
         for line in out.splitlines():
-            if 'nvidia-smi' in str(line):
+            if 'nvidia-smi --query-gpu=index,timestamp,utilization.gpu' in str(line):
                 print(str(line))
                 print('found nvidia-smi and am attempting to kill')
                 pid = int(str(line).split()[1])
                 os.kill(pid, signal.SIGKILL)
+
+        df = pandas.read_csv(self.file_path, converters={' utilization.memory [%]': p2f, ' utilization.gpu [%]': p2f})
+        m = df.groupby(['index'])[' utilization.gpu [%]', ' utilization.memory [%]'].mean()
+        with open(self.file_path, 'a+') as file:
+            file.write(str(m))
 
 
 class CPUPoll(threading.Thread):
@@ -50,10 +61,11 @@ class CPUPoll(threading.Thread):
         print('the value of prof_gpu is {}'.format(prof_gpu))
         self.prof_gpu = prof_gpu
         self.output_dir = output_dir
+        self.file_path = os.path.join(output_dir, 'profile.cpu.csv')
 
         import logging
         self.logger = logging.getLogger('cpuutil')
-        file_handler = logging.FileHandler(os.path.join(output_dir,'profile.cpu.csv'), mode='w')
+        file_handler = logging.FileHandler(self.file_path, mode='w')
         # file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
         self.logger.setLevel(logging.DEBUG)
@@ -76,7 +88,8 @@ class CPUPoll(threading.Thread):
             mem = psutil.virtual_memory()
 
             # this data, cpu_percent and virtual memory, is written to a log file every 5 seconds
-            aa = "".join([str(datetime.datetime.now()), ',', str(cpu_percent), ',', str(mem.percent),',',str(mem.used/gig_val)])
+            aa = "".join([str(datetime.datetime.now()), ',', str(cpu_percent), ',', str(mem.percent), ',',
+                          str(mem.used / gig_val)])
             self.logger.info(aa)
             time.sleep(5)
 
@@ -87,6 +100,10 @@ class CPUPoll(threading.Thread):
 
     def stop(self):
         self.stop_event.set()
+        df = pandas.read_csv(self.file_path)
+        m = df.mean()
+        with open(self.file_path, 'a+') as file:
+            file.write(str(m))
 
     def __enter__(self):
         self.start()
@@ -119,7 +136,6 @@ def run_profile(f):
             print("nvidia-smi is there")
             prof_gpu = True
 
-
         # was initially entering tf's profileContext
         # could probably put that around the CPUPoll statement if we wanted
 
@@ -128,10 +144,11 @@ def run_profile(f):
 
         with CPUPoll(prof_gpu, output_dir) as cpu_poll:
             return f(*args, **kwds)
+
     return decorated
 
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     # @run_profile
     # def dummy(dict_arg):
     #     pass
