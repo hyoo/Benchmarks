@@ -30,6 +30,7 @@ def initialize_parameters():
     return gParameters
 
 
+@candle.run_profile
 def run(gParameters):
     
     # Construct extension to save model

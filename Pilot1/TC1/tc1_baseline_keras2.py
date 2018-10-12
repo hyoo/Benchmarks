@@ -43,6 +43,7 @@ def initialize_parameters():
     return gParameters
 
 
+@candle.run_profile
 def run(gParameters):
 
     X_train, Y_train, X_test, Y_test = bmk.load_data(gParameters)
