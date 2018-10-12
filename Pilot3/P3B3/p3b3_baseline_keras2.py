@@ -132,7 +132,7 @@ def run_cnn( GP, train_x, train_y, test_x, test_y,
     return history
 
 
-
+@candle.run_profile
 def run(gParameters, fpath):
 
     # Get default parameters for initialization and optimizer functions

@@ -197,7 +197,7 @@ def evaluate_model(X_test, truths_test, labels_test, models):
 
     return ret
 
-
+@candle.run_profile
 def run(gParameters, fpath):
 
     # Get default parameters for initialization and optimizer functions

@@ -76,6 +76,7 @@ def initialize_parameters():
     return GP
 
 
+@candle.run_profile
 def run(GP):
 
     # set the seed
