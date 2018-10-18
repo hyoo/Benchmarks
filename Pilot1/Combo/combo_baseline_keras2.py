@@ -687,6 +687,12 @@ def run(params):
     train_steps = int(loader.n_train / args.batch_size)
     val_steps = int(loader.n_val / args.batch_size)
 
+    config = K.tensorflow_backend.tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
+    config.graph_options.optimizer_options.global_jit_level = K.tensorflow_backend.tf.OptimizerOptions.ON_1
+    config.gpu_options.allow_growth = True
+    sess = K.tensorflow_backend.tf.Session(config=config)
+    K.set_session(sess)
+
     model = build_model(loader, args, verbose=True)
     model.summary()
     # plot_model(model, to_file=prefix+'.model.png', show_shapes=True)

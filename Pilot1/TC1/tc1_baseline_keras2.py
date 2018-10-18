@@ -63,6 +63,11 @@ def run(gParameters):
     print('X_train shape:', X_train.shape)
     print('X_test shape:', X_test.shape)
 
+    config = K.tensorflow_backend.tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
+    config.graph_options.optimizer_options.global_jit_level = K.tensorflow_backend.tf.OptimizerOptions.ON_1
+    config.gpu_options.allow_growth = True
+    K.set_session(K.tensorflow_backend.tf.Session(config=config))
+
     model = Sequential()
     dense_first = True
 

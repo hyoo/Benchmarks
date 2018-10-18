@@ -343,6 +343,12 @@ def run(params):
     loader.partition_data(cv_folds=args.cv, train_split=train_split, val_split=val_split,
                           cell_types=args.cell_types, by_cell=args.by_cell, by_drug=args.by_drug)
 
+    config = K.tensorflow_backend.tf.ConfigProto(allow_soft_placement=True, log_device_placement=False)
+    config.graph_options.optimizer_options.global_jit_level = K.tensorflow_backend.tf.OptimizerOptions.ON_1
+    config.gpu_options.allow_growth = True
+    sess = K.tensorflow_backend.tf.Session(config=config)
+    K.set_session(sess)
+
     model = build_model(loader, args)
     logger.info('Combined model:')
     model.summary(print_fn=logger.info)
