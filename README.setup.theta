@@ -48,6 +48,8 @@ export OMP_NUM_THREADS=128
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+# DIR = /projects/CSC249ADOA01/hsyoo/profile/Benchmarks
+
 # for custom deps
 export PYTHONPATH=$PYTHONPATH:$DIR/pylibs/lib/python3.5/site-packages/
 
@@ -91,6 +93,27 @@ sleep 1
 echo "Starting combo"
 mkdir -p "$result_dir/combo/"
 aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/Combo/combo_baseline_keras2.py --conf $DIR/Pilot1/Combo/combo_perf_bench_model.txt -e 1 --output_dir "$result_dir/combo/" > "$result_dir/combo/std.out" &
+sleep 1
+
+echo "Starting p2b1"
+mkdir -p "$result_dir/p2b1/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot2/P2B1/p2b1_baseline_keras2.py --conf $DIR/Pilot2/P2B1/p2b1_medium_model.txt  --output_dir "$result_dir/p2b1/" > "$result_dir/p2b1/std.out" &
+sleep 1
+
+echo "Starting p3b1"
+mkdir -p "$result_dir/p3b1/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot3/P3B1/p3b1_baseline_keras2.py  --output_dir "$result_dir/p3b1/" > "$result_dir/p3b1/std.out" &
+sleep 1
+
+
+echo "Starting p3b2"
+mkdir -p "$result_dir/p3b2/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot3/P3B2/p3b2_baseline_keras2.py  --output_dir "$result_dir/p3b2/" > "$result_dir/p3b2/std.out" &
+sleep 1
+
+echo "Starting p3b3"
+mkdir -p "$result_dir/p3b3/"
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot3/P3B3/p3b3_baseline_keras2.py  --output_dir "$result_dir/p3b3/" > "$result_dir/p3b3/std.out" &
 wait
 
 ```
