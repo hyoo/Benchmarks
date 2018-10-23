@@ -5,6 +5,8 @@ from keras import backend as K
 from keras import optimizers
 from keras import initializers
 
+from keras.layers import Dropout
+from keras.utils import get_custom_objects
 from keras.metrics import binary_crossentropy, mean_squared_error
 
 from scipy.stats.stats import pearsonr
@@ -18,6 +20,9 @@ with warnings.catch_warnings():
 
 import os
 def set_parallelism_threads():
+    """ Set the number of parallel threads according to the number available on the hardware
+    """
+
     if K.backend() == 'tensorflow' and 'NUM_INTRA_THREADS' in os.environ and 'NUM_INTER_THREADS' in os.environ:
         import tensorflow as tf
         # print('Using Thread Parallelism: {} NUM_INTRA_THREADS, {} NUM_INTER_THREADS'.format(os.environ['NUM_INTRA_THREADS'], os.environ['NUM_INTER_THREADS']))
@@ -29,6 +34,14 @@ def set_parallelism_threads():
 
 
 def set_seed(seed):
+    """ Set the random number seed to the desired value
+
+        Parameters
+        ----------
+        seed : integer
+            Random number seed. 
+    """
+
     set_seed_defaultUtils(seed)
 
     if K.backend() == 'tensorflow':
@@ -38,16 +51,38 @@ def set_seed(seed):
 
 def get_function(name):
     mapping = {}
-    
+
     mapped = mapping.get(name)
     if not mapped:
         raise Exception('No keras function found for "{}"'.format(name))
-    
+
     return mapped
 
 
 
 def build_optimizer(type, lr, kerasDefaults):
+    """ Set the optimizer to the appropriate Keras optimizer function
+        based on the input string and learning rate. Other required values
+        are set to the Keras default values
+
+        Parameters
+        ----------
+        type : string
+            String to choose the optimizer
+
+            Options recognized: 'sgd', 'rmsprop', 'adagrad', adadelta', 'adam'
+            See the Keras documentation for a full description of the options
+
+        lr : float
+            Learning rate
+
+        kerasDefaults : list
+            List of default parameter values to ensure consistency between frameworks
+
+        Returns
+        ----------
+        The appropriate Keras optimizer function
+    """
 
     if type == 'sgd':
         return optimizers.SGD(lr=lr, decay=kerasDefaults['decay_lr'],
@@ -55,7 +90,7 @@ def build_optimizer(type, lr, kerasDefaults):
                               nesterov=kerasDefaults['nesterov_sgd'])#,
             #clipnorm=kerasDefaults['clipnorm'],
             #clipvalue=kerasDefaults['clipvalue'])
-    
+
     elif type == 'rmsprop':
         return optimizers.RMSprop(lr=lr, rho=kerasDefaults['rho'],
                                   epsilon=kerasDefaults['epsilon'],
@@ -101,10 +136,37 @@ def build_optimizer(type, lr, kerasDefaults):
 
 
 def build_initializer(type, kerasDefaults, seed=None, constant=0.):
-    
+    """ Set the initializer to the appropriate Keras initializer function 
+        based on the input string and learning rate. Other required values 
+        are set to the Keras default values
+
+        Parameters
+        ----------
+        type : string
+            String to choose the initializer
+
+            Options recognized: 'constant', 'uniform', 'normal', 
+            'glorot_uniform', 'lecun_uniform', 'he_normal'
+
+            See the Keras documentation for a full description of the options
+
+        kerasDefaults : list
+            List of default parameter values to ensure consistency between frameworks
+
+        seed : integer
+            Random number seed
+
+        constant : float
+            Constant value (for the constant initializer only)
+
+        Return
+        ----------
+        The appropriate Keras initializer function
+    """
+
     if type == 'constant':
         return initializers.Constant(value=constant)
-    
+
     elif type == 'uniform':
         return initializers.RandomUniform(minval=kerasDefaults['minval_uniform'],
                                   maxval=kerasDefaults['maxval_uniform'],
@@ -155,3 +217,18 @@ def evaluate_autoencoder(y_pred, y_test):
     # print('Mean squared error: {}%'.format(mse))
     return {'mse': mse, 'r2_score': r2, 'correlation': corr}
 
+
+class PermanentDropout(Dropout):
+    def __init__(self, rate, **kwargs):
+        super(PermanentDropout, self).__init__(rate, **kwargs)
+        self.uses_learning_phase = False
+
+    def call(self, x, mask=None):
+        if 0. < self.rate < 1.:
+            noise_shape = self._get_noise_shape(x)
+            x = K.dropout(x, self.rate, noise_shape)
+        return x
+
+
+def register_permanent_dropout():
+    get_custom_objects()['PermanentDropout'] = PermanentDropout
