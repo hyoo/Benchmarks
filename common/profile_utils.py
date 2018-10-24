@@ -22,30 +22,21 @@ class GPUMonitorThread(threading.Thread):
 
     def __init__(self, output_dir):
         threading.Thread.__init__(self)
-        self.proc_id = None
+        self.proc = None
         self.output_dir = output_dir
         self.file_path = os.path.join(self.output_dir, 'profile.gpu.csv')
 
     def run(self):
-        # save_path = os.path.join(self.output_dir, 'profile.gpu.csv')
-        self.proc_id = subprocess.Popen(
-            ["nvidia-smi --query-gpu=index,timestamp,utilization.gpu,utilization.memory --format=csv -l 1 > {}".format(
-                self.file_path)],
-            shell=True)
+        # need to set preexec_fn here, bc shell=True doesn't return pid of process but that of shell
+        self.proc = subprocess.Popen(
+            ["/usr/bin/nvidia-smi --query-gpu=index,timestamp,utilization.gpu,utilization.memory --format=csv -l 1 > {}".format(self.file_path)],
+            shell=True, preexec_fn=os.setsid)
+
 
     def stop(self):
         # terminate the spawned proc
-        self.proc_id.terminate()
-
-        # still have to go and kill the nvidia-smi command, bc it is still logging
-        p = subprocess.Popen(['ps', '-aux'], stdout=subprocess.PIPE)
-        out, err = p.communicate()
-        for line in out.splitlines():
-            if 'nvidia-smi --query-gpu=index,timestamp,utilization.gpu' in str(line):
-                print(str(line))
-                print('found nvidia-smi and am attempting to kill')
-                pid = int(str(line).split()[1])
-                os.kill(pid, signal.SIGKILL)
+        # self.proc_id.terminate()
+        os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
 
         df = pandas.read_csv(self.file_path, converters={' utilization.memory [%]': p2f, ' utilization.gpu [%]': p2f})
         m = df.groupby(['index'])[' utilization.gpu [%]', ' utilization.memory [%]'].mean()
