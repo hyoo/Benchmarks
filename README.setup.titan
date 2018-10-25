@@ -1,0 +1,129 @@
+# Setup
+1. Clone Benchmarks repo
+```
+git clone -b release_01 https://github.com/ECP-CANDLE/Benchmarks.git
+```
+
+2. Data directory
+```
+cd Benchmarks
+ln -s /lustre/atlas/proj-shared/med106/hsyoo/BenchmarkData/ Data
+```
+
+3. install third party modules
+```
+# download package with regular python
+mkdir builds
+cd builds
+module python/3.6.3
+pip3 download psutil
+pip3 download pandas
+pip3 download scikit-learn
+module unload python
+cd ..
+
+# switch to deeplearning python
+module load deeplearning
+mkdir -p pylibs/lib/python3.6/site-packages/
+export PYTHONPATH=/ccs/home/hsyoo/hsyoo/pylib/lib/python3.6/site-packages/:$PYTHONPATH
+# compile & install psutil
+cd build/psutil-5.4.7/
+python setup.py install --prefix=../../pylib/
+cd ..
+# install pandas
+pip install --prefix=../pylibs/ --ignore-installed pandas-0.23.4-cp36-cp36m-manylinux1_x86_64.whl
+# install scikit learn
+pip install --prefix=../pylibs/ --ignore-installed scikit_learn-0.20.0-cp36-cp36m-manylinux1_x86_64.whl
+```
+
+
+# Running Benchmarks
+Save code below `submit_jobs.sh` and make the script executable.
+
+
+```
+#!/bin/bash
+#PBS -A med106
+#PBS -N CANDLE_BENCHMARK
+#PBS -l nodes=12
+#PBS -l walltime=02:00:00
+
+set -x
+
+unset PYTHONPATH
+unset LD_LIBRARY_PATH
+
+module load deeplearning
+
+DIR=$PBS_O_WORKDIR
+cd $DIR
+
+# for custom deps
+export PYTHONPATH=$DIR/pylibs/lib/python3.6/site-packages/:$PYTHONPATH
+
+result_dir=$(date +"results_%Y%m%d.%H%M%S")
+mkdir -p $result_dir
+
+echo "Check Env"
+aprun -n 1 -N 1 -cc none python3 $DIR/env.py > "$result_dir/env.std.out" &
+sleep 1
+
+#skip p1b1 since the model is too big to fit in 8GB memory
+#echo "Starting p1b1"
+#mkdir -p "$result_dir/p1b1/"
+#aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/P1B1/p1b1_baseline_keras2.py --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
+#sleep 1
+
+echo "Starting p1b2"
+mkdir -p "$result_dir/p1b2/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/P1B2/p1b2_baseline_keras2.py --output_dir "$result_dir/p1b2/" > "$result_dir/p1b2/std.out" &
+sleep 1
+
+echo "Starting p1b3"
+mkdir -p "$result_dir/p1b3/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/P1B3/p1b3_baseline_keras2.py --conf $DIR/Pilot1/P1B3/p1b3_perf_bench_model.txt --output_dir "$result_dir/p1b3/" > "$result_dir/p1b3/std.out" &
+sleep 1
+
+echo "Starting tc1"
+mkdir -p "$result_dir/tc1/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/TC1/tc1_baseline_keras2.py --output_dir "$result_dir/tc1/" > "$result_dir/tc1/std.out" &
+sleep 1
+
+echo "Starting nt3"
+mkdir -p "$result_dir/nt3/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/NT3/nt3_baseline_keras2.py --conf $DIR/Pilot1/NT3/nt3_perf_bench_model.txt --output_dir "$result_dir/nt3/" > "$result_dir/nt3/std.out" &
+sleep 1
+
+#keras version 2.0.3 does not supprot summary(print_fn) which is introduced in 2.0.6, clone_model which is introduced in 2.0.7
+#echo "Starting uno"
+#mkdir -p "$result_dir/uno/"
+#aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/Uno/uno_baseline_keras2.py --conf $DIR/Pilot1/Uno/uno_perf_bench_model.txt --output_dir "$result_dir/uno/" > "$result_dir/uno/std.out" &
+#sleep 1
+
+#keras version 2.0.3 does not supprot clone_model which is introduced in 2.0.7
+#echo "Starting combo"
+#mkdir -p "$result_dir/combo/"
+#aprun -n 1 -N 1 -cc none -T python3 ./Pilot1/Combo/combo_baseline_keras2.py --conf $DIR/Pilot1/Combo/combo_perf_bench_model.txt --output_dir "$result_dir/combo/" > "$result_dir/combo/std.out" &
+#sleep 1
+
+echo "Starting p2b1"
+mkdir -p "$result_dir/p2b1/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot2/P2B1/p2b1_baseline_keras2.py --conf $DIR/Pilot2/P2B1/p2b1_medium_model.txt --output_dir "$result_dir/p2b1/" > "$result_dir/p2b1/std.out" &
+sleep 1
+
+echo "Starting p3b1"
+mkdir -p "$result_dir/p3b1/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot3/P3B1/p3b1_baseline_keras2.py --output_dir "$result_dir/p3b1/" > "$result_dir/p3b1/std.out" &
+sleep 1
+
+echo "Starting p3b2"
+mkdir -p "$result_dir/p3b2/"
+aprun -n 1 -N 1 -cc none -T python3 ./Pilot3/P3B2/p3b2_baseline_keras2.py --output_dir "$result_dir/p3b2/" > "$result_dir/p3b2/std.out" &
+sleep 1
+
+echo "Starting p3b3"
+mkdir -p "$result_dir/p3b3/"
+aprun -n 1 -N 1 -cc none -T -b python3 ./Pilot3/P3B3/p3b3_baseline_keras2.py --output_dir "$result_dir/p3b3/" > "$result_dir/p3b3/std.out" &
+wait
+
+```
