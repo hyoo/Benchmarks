@@ -1,0 +1,61 @@
+a preliminary script for nucleus, which runs each benchmark sequentially:
+
+```
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+
+result_dir=$(date +"results_%Y%m%d.%H%M%S")
+mkdir -p $result_dir
+
+
+export CUDA_VISIBLE_DEVICES=3
+
+echo "Starting p1b1"
+mkdir -p "$result_dir/p1b1/"
+nohup time python ./Pilot1/P1B1/p1b1_baseline_keras2.py --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
+wait
+
+echo "Starting p1b2"
+mkdir -p "$result_dir/p1b2/"
+nohup time python ./Pilot1/P1B2/p1b2_baseline_keras2.py --output_dir "$result_dir/p1b2/" > "$result_dir/p1b2/std.out" &
+wait
+
+
+echo "Starting p1b3"
+mkdir -p "$result_dir/p1b3/"
+nohup time python ./Pilot1/P1B3/p1b3_baseline_keras2.py --conf $DIR/Pilot1/P1B3/p1b3_perf_bench_model.txt --output_dir "$result_dir/p1b3/" > "$result_dir/p1b3/std.out" &
+wait
+
+
+echo "Starting uno"
+mkdir -p "$result_dir/uno/"
+nohup time python ./Pilot1/Uno/uno_baseline_keras2.py --conf $DIR/Pilot1/Uno/uno_perf_bench_model.txt --output_dir "$result_dir/uno/" > "$result_dir/uno/std.out" &
+wait
+
+echo "Starting combo"
+mkdir -p "$result_dir/combo/"
+nohup time python ./Pilot1/Combo/combo_baseline_keras2.py --conf $DIR/Pilot1/Combo/combo_perf_bench_model.txt --output_dir "$result_dir/combo/" > "$result_dir/combo/std.out" &
+wait
+
+
+echo "Starting p2b1"
+mkdir -p "$result_dir/p2b1/"
+nohup time python ./Pilot2/P2B1/p2b1_baseline_keras2.py --conf $DIR/Pilot2/P2B1/p2b1_small_model.txt --output_dir "$result_dir/p2b1/" > "$result_dir/p2b1/std.out" &
+wait
+
+
+echo "Starting p3b1"
+mkdir -p "$result_dir/p3b1/"
+nohup time python ./Pilot3/P3B1/p3b1_baseline_keras2.py  --output_dir "$result_dir/p3b1/" > "$result_dir/p3b1/std.out" &
+wait
+
+echo "Starting p3b2"
+mkdir -p "$result_dir/p3b2/"
+nohup time python ./Pilot3/P3B2/p3b2_baseline_keras2.py  --output_dir "$result_dir/p3b2/" > "$result_dir/p3b2/std.out" &
+wait
+
+echo "Starting p3b3"
+mkdir -p "$result_dir/p3b3/"
+nohup time python ./Pilot3/P3B3/p3b3_baseline_keras2.py  --output_dir "$result_dir/p3b3/" > "$result_dir/p3b3/std.out"  &
+wait
+```
