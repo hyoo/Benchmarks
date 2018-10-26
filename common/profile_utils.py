@@ -15,7 +15,12 @@ import pandas
 
 
 def p2f(x):
-    return float(x.strip('%'))
+    # adding this right now bc I saw an error, will think about better way to fix.
+    try:
+        return float(x.strip('%'))
+    except Exception as e:
+        print(e)
+        return 1.00
 
 
 class GPUMonitorThread(threading.Thread):
