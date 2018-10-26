@@ -27,7 +27,7 @@ wait
 
 echo "Starting tc1"
 mkdir -p "$result_dir/tc1/"
-nohup time python ./Pilot1/TC1/tc1_baseline_keras2.py --output_dir "$result_dir/tc1/" > "$result_dir/tc1/std.out" &
+nohup time python ./Pilot1/TC1/tc1_baseline_keras2.py --conf $DIR/Pilot1/TC1/tc1_perf_bench_model.txt --output_dir "$result_dir/tc1/" > "$result_dir/tc1/std.out" &
 wait
 
 echo "Starting nt3"
