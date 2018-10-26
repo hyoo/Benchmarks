@@ -20,12 +20,20 @@ mkdir -p "$result_dir/p1b2/"
 nohup time python ./Pilot1/P1B2/p1b2_baseline_keras2.py --output_dir "$result_dir/p1b2/" > "$result_dir/p1b2/std.out" &
 wait
 
-
 echo "Starting p1b3"
 mkdir -p "$result_dir/p1b3/"
 nohup time python ./Pilot1/P1B3/p1b3_baseline_keras2.py --conf $DIR/Pilot1/P1B3/p1b3_perf_bench_model.txt --output_dir "$result_dir/p1b3/" > "$result_dir/p1b3/std.out" &
 wait
 
+echo "Starting tc1"
+mkdir -p "$result_dir/tc1/"
+nohup time python ./Pilot1/TC1/tc1_baseline_keras2.py --output_dir "$result_dir/tc1/" > "$result_dir/tc1/std.out" &
+wait
+
+echo "Starting nt3"
+mkdir -p "$result_dir/nt3/"
+nohup time python ./Pilot1/NT3/nt3_baseline_keras2.py --conf $DIR/Pilot1/NT3/nt3_perf_bench_model.txt --output_dir "$result_dir/nt3/" > "$result_dir/nt3/std.out" &
+wait
 
 echo "Starting uno"
 mkdir -p "$result_dir/uno/"
