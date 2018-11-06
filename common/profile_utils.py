@@ -44,7 +44,7 @@ class GPUMonitorThread(threading.Thread):
         os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
 
         df = pandas.read_csv(self.file_path, converters={' utilization.memory [%]': p2f, ' utilization.gpu [%]': p2f})
-        m = df.groupby(['index'])[' utilization.gpu [%]', ' utilization.memory [%]'].mean()
+        m = df.loc[df[' utilization.memory [%]'] > 0].groupby(['index'])[' utilization.gpu [%]', ' utilization.memory [%]'].mean()
         with open(self.file_path, 'a+') as file:
             file.write(str(m))
 
