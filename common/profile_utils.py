@@ -37,14 +37,25 @@ class GPUMonitorThread(threading.Thread):
             ["/usr/bin/nvidia-smi --query-gpu=index,timestamp,utilization.gpu,utilization.memory --format=csv -l 1 > {}".format(self.file_path)],
             shell=True, preexec_fn=os.setsid)
 
-
     def stop(self):
-        # terminate the spawned proc
-        # self.proc_id.terminate()
+
         os.killpg(os.getpgid(self.proc.pid), signal.SIGTERM)
 
-        df = pandas.read_csv(self.file_path, converters={' utilization.memory [%]': p2f, ' utilization.gpu [%]': p2f})
+        df = pandas.read_csv(self.file_path)
+
+        # including this line because nvidia-smi has a possibility of dropping the index in some rows.
+        # here we restrict to a reasonable integer index and hopefully exclude incomplete rows
+        df = df[df['index'].isin(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'])]
+
+        # apply function that removes %'s from columns and returns integer
+        df[' utilization.memory [%]'] = df[' utilization.memory [%]'].apply(p2f)
+        df[' utilization.gpu [%]'] = df[' utilization.gpu [%]'].apply(p2f)
+
         m = df.loc[df[' utilization.memory [%]'] > 0].groupby(['index'])[' utilization.gpu [%]', ' utilization.memory [%]'].mean()
+
+        # df = pandas.read_csv(self.file_path, converters={' utilization.memory [%]': p2f, ' utilization.gpu [%]': p2f})
+        # m = df.loc[df[' utilization.memory [%]'] > 0].groupby(['index'])[' utilization.gpu [%]', ' utilization.memory [%]'].mean()
+
         with open(self.file_path, 'a+') as file:
             file.write(str(m))
 
