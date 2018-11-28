@@ -12,7 +12,7 @@ export CUDA_VISIBLE_DEVICES=3
 
 echo "Starting p1b1"
 mkdir -p "$result_dir/p1b1/"
-nohup time python ./Pilot1/P1B1/p1b1_baseline_keras2.py --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
+nohup time python ./Pilot1/P1B1/p1b1_baseline_keras2.py --conf $DIR/Pilot1/P1B1/p1b1_perf_bench_model.txt --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
 wait
 
 echo "Starting p1b2"
