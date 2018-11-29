@@ -62,7 +62,7 @@ sleep 1
 
 echo "Starting p1b1"
 mkdir -p "$result_dir/p1b1/"
-aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/P1B1/p1b1_baseline_keras2.py --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
+aprun -n 1 -N 1 -cc none -T --wdir $DIR -b python3 ./Pilot1/P1B1/p1b1_baseline_keras2.py --conf $DIR/Pilot1/P1B1/p1b1_perf_bench_model.txt --output_dir "$result_dir/p1b1/" > "$result_dir/p1b1/std.out" &
 sleep 1
 
 echo "Starting p1b2"
