@@ -40,6 +40,11 @@ logger = logging.getLogger(__name__)
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
+import tensorflow as tf
+
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
+K.tensorflow_backend.set_session(tf.Session(config=config))
 
 def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = '0'
@@ -48,7 +53,7 @@ def set_seed(seed):
     random.seed(seed)
 
     if K.backend() == 'tensorflow':
-        import tensorflow as tf
+
         tf.set_random_seed(seed)
         # session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
         # sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
