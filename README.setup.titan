@@ -15,7 +15,7 @@ ln -s /lustre/atlas/proj-shared/med106/hsyoo/BenchmarkData/ Data
 # download package with regular python
 mkdir builds
 cd builds
-module python/3.6.3
+module load python/3.6.3
 pip3 download psutil
 pip3 download pandas
 pip3 download scikit-learn
