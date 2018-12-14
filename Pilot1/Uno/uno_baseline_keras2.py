@@ -244,7 +244,7 @@ def build_model(loader, args, permanent_dropout=True, silent=False):
                                       dropout_rate=dropout_rate, permanent_dropout=permanent_dropout)
             if not silent:
                 logger.debug('Feature encoding submodel for %s:', fea_type)
-                box.summary(print_fn=logger.debug)
+                # box.summary(print_fn=logger.debug)
             input_models[fea_type] = box
 
     inputs = []
@@ -351,7 +351,7 @@ def run(params):
 
     model = build_model(loader, args)
     logger.info('Combined model:')
-    model.summary(print_fn=logger.info)
+    # model.summary(print_fn=logger.info)
     # plot_model(model, to_file=prefix+'.model.png', show_shapes=True)
 
     if args.cp:
