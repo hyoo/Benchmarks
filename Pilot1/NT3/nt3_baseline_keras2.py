@@ -71,7 +71,7 @@ def load_data(train_path, test_path, gParameters):
     return X_train, Y_train, X_test, Y_test
 
 
-@candle.run_profile
+# @candle.run_profile
 def run(gParameters):
 
     print ('Params:', gParameters)

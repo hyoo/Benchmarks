@@ -204,7 +204,7 @@ def add_conv_layer(model, layer_params, input_dim=None, locally_connected=False)
     return model
 
 
-@candle.run_profile
+# @candle.run_profile
 def run(gParameters):
     """
     Runs the model using the specified set of parameters

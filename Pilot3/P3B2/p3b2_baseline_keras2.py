@@ -46,7 +46,7 @@ def sample( preds, temperature= 1.0 ):
     return np.argmax( probas )
 
 
-@candle.run_profile
+# @candle.run_profile
 def run(gParameters, data_path):
 
     kerasDefaults = candle.keras_default_config()
