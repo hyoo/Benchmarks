@@ -943,7 +943,7 @@ class CombinedDataLoader(object):
 class CombinedDataGenerator(object):
     """Generate training, validation or testing batches from loaded data
     """
-    def __init__(self, data, partition='train', fold=0, source=None, batch_size=32, shuffle=True):
+    def __init__(self, data, partition='train', fold=0, source=None, batch_size=32, shuffle=True, rank=0, total_ranks=1):
         self.data = data
         self.partition = partition
         self.batch_size = batch_size
@@ -961,13 +961,14 @@ class CombinedDataGenerator(object):
 
         if shuffle:
             index = np.random.permutation(index)
-        # index = index[:len(index)//10]
 
-        self.index = index
-        self.index_cycle = cycle(index)
-        self.size = len(index)
-        self.steps = np.ceil(self.size / batch_size)
-        # self.steps = np.ceil(self.size / batch_size / 100)
+        # sharing by rank
+        samples_per_rank = len(index) // total_ranks
+
+        self.index = index[rank * samples_per_rank:(rank + 1) * samples_per_rank]
+        self.index_cycle = cycle(self.index)
+        self.size = len(self.index)
+        self.steps = self.size // sel.batch_size
 
     def reset(self):
         self.index_cycle = cycle(self.index)
