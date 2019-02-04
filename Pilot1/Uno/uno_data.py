@@ -968,7 +968,7 @@ class CombinedDataGenerator(object):
         self.index = index[rank * samples_per_rank:(rank + 1) * samples_per_rank]
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
-        self.steps = self.size // sel.batch_size
+        self.steps = self.size // self.batch_size
 
     def reset(self):
         self.index_cycle = cycle(self.index)
