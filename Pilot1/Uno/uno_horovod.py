@@ -304,8 +304,9 @@ def run(params):
     config.gpu_options.allow_growth = True
     config.gpu_options.visible_device_list = str(hvd.local_rank())
     K.set_session(tf.Session(config=config))
+    print("running total:{0}, local_rank:{1}, rank:{2}".format(hvd.size(), hvd.local_rank(), hvd.rank()))
 
-    verbose = 1 if hvd.local_rank() == 0 else 0
+    verbose = 1 if hvd.rank() == 0 else 0
 
     args = Struct(**params)
     set_seed(args.rng_seed)
@@ -431,8 +432,8 @@ def run(params):
         if args.tb:
             callbacks.append(tensorboard)
 
-        train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle, rank=hvd.local_rank(), total_ranks=hvd.size())
-        val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle, rank=hvd.local_rank(), total_ranks=hvd.size())
+        train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle, rank=hvd.rank(), total_ranks=hvd.size())
+        val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle, rank=hvd.rank(), total_ranks=hvd.size())
 
         df_val = val_gen.get_response(copy=True)
         y_val = df_val[target].values

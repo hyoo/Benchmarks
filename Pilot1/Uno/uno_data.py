@@ -964,11 +964,13 @@ class CombinedDataGenerator(object):
 
         # sharing by rank
         samples_per_rank = len(index) // total_ranks
+        samples_per_rank = self.batch_size * (samples_per_rank // self.batch_size)
 
         self.index = index[rank * samples_per_rank:(rank + 1) * samples_per_rank]
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
         self.steps = self.size // self.batch_size
+        print("partition:{0}, rank:{1}, sharded index size:{2}, batch_size:{3}, steps:{4}".format(partition, rank, self.size, self.batch_suze, self.steps))
 
     def reset(self):
         self.index_cycle = cycle(self.index)
