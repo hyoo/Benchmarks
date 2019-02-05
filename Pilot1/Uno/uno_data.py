@@ -970,7 +970,7 @@ class CombinedDataGenerator(object):
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
         self.steps = self.size // self.batch_size
-        print("partition:{0}, rank:{1}, sharded index size:{2}, batch_size:{3}, steps:{4}".format(partition, rank, self.size, self.batch_suze, self.steps))
+        print("partition:{0}, rank:{1}, sharded index size:{2}, batch_size:{3}, steps:{4}".format(partition, rank, self.size, self.batch_size, self.steps))
 
     def reset(self):
         self.index_cycle = cycle(self.index)
