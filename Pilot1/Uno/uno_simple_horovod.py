@@ -7,7 +7,7 @@ import numpy as np
 import keras
 from keras import backend as K
 from keras.models import Model
-from keras.layers import Input, Dense, Dropout
+from keras.layers import Input, Dense
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.stats.stats import pearsonr
 
@@ -51,33 +51,23 @@ def log_evaluation(metric_outputs, description='Comparing y_true and y_pred:'):
 
 
 def build_feature_model(input_shape, name='', dense_layers=[1000, 1000],
-                        activation='relu', residual=False,
-                        dropout_rate=0):
+                        activation='relu'):
     x_input = Input(shape=input_shape)
     h = x_input
     for i, layer in enumerate(dense_layers):
-        x = h
         h = Dense(layer, activation=activation)(h)
-        if dropout_rate > 0:
-            h = Dropout(dropout_rate)(h)
-        if residual:
-            try:
-                h = keras.layers.add([h, x])
-            except ValueError:
-                pass
+
     model = Model(x_input, h, name=name)
     return model
 
 
 def build_model(loader, args):
     input_models = {}
-    dropout_rate = args.drop
     for fea_type, shape in loader.feature_shapes.items():
         base_type = fea_type.split('.')[0]
         if base_type in ['cell', 'drug']:
             box = build_feature_model(input_shape=shape, name=fea_type,
-                                      dense_layers=args.dense_feature_layers,
-                                      dropout_rate=dropout_rate)
+                                      dense_layers=args.dense_feature_layers)
             input_models[fea_type] = box
 
     inputs = []
@@ -97,15 +87,8 @@ def build_model(loader, args):
 
     h = merged
     for i, layer in enumerate(args.dense):
-        x = h
         h = Dense(layer, activation=args.activation)(h)
-        if dropout_rate > 0:
-            h = Dropout(dropout_rate)(h)
-        if args.residual:
-            try:
-                h = keras.layers.add([h, x])
-            except ValueError:
-                pass
+
     output = Dense(1)(h)
 
     return Model(inputs, output)
@@ -120,8 +103,8 @@ def run():
     # horovod init
     hvd.init()
     config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    config.gpu_options.visible_device_list = str(hvd.local_rank())
+    # config.gpu_options.allow_growth = True
+    # config.gpu_options.visible_device_list = str(hvd.local_rank())
     K.set_session(tf.Session(config=config))
     print("running total:{0}, local_rank:{1}, rank:{2}".format(hvd.size(), hvd.local_rank(), hvd.rank()))
 
@@ -186,7 +169,8 @@ def run():
     optimizer = keras.optimizers.Adadelta(lr=1.0 * hvd.size())
     optimizer = hvd.DistributedOptimizer(optimizer)
 
-    model.compile(loss=args.loss, optimizer=optimizer, metrics=[mae, r2])
+    # model.compile(loss=args.loss, optimizer=optimizer, metrics=[mae, r2])
+    model.compile(loss=args.loss, optimizer=optimizer, metrics=['accuracy'])
 
     # calculate trainable and non-trainable params
     # params.update(candle.compute_trainable_params(model))
