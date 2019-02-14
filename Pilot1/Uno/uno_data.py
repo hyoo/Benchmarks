@@ -752,7 +752,7 @@ class CombinedDataLoader(object):
 
     def build_feature_list(self, single=False):
         input_features = collections.OrderedDict()
-        feature_shapes = {}
+        feature_shapes = collections.OrderedDict()
 
         if not self.agg_dose:
             doses = ['dose1', 'dose2'] if not single else ['dose1']
