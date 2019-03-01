@@ -307,6 +307,7 @@ def run(params):
     print("running total:{0}, local_rank:{1}, rank:{2}".format(hvd.size(), hvd.local_rank(), hvd.rank()))
 
     verbose = 1 if hvd.rank() == 0 else 0
+    params['batch_size'] = int(params['batch_size']) // hvd.size()
 
     args = Struct(**params)
     set_seed(args.rng_seed)
