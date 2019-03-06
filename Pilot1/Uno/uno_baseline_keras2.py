@@ -389,7 +389,7 @@ def run(params):
             gpu_count = len(args.gpus)
             model = multi_gpu_model(build_model(loader, args, silent=True), cpu_merge=False, gpus=gpu_count)
             max_queue_size = 10 * gpu_count
-            use_multiprocessing = True
+            use_multiprocessing = False
             workers = 2 * gpu_count
         else:
             model = build_model(loader,args, silent=True)
