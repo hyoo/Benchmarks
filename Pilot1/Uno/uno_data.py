@@ -9,6 +9,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+import keras
 
 from itertools import cycle, islice
 
@@ -940,7 +941,7 @@ class CombinedDataLoader(object):
             self.save_to_cache(cache, params)
 
 
-class CombinedDataGenerator(object):
+class CombinedDataGenerator(keras.utils.Sequence):
     """Generate training, validation or testing batches from loaded data
     """
     def __init__(self, data, partition='train', fold=0, source=None, batch_size=32, shuffle=True, rank=0, total_ranks=1):
@@ -972,6 +973,14 @@ class CombinedDataGenerator(object):
         self.steps = self.size // self.batch_size
         print("partition:{0}, rank:{1}, sharded index size:{2}, batch_size:{3}, steps:{4}".format(partition, rank, self.size, self.batch_size, self.steps))
 
+    def __len__(self):
+        return self.steps
+
+    def __getitem__(self, idx):
+        shard = self.index[idx * self.batch_size:(idx + 1) * self.batch_size]
+        x_list, y = self.get_slice(self.batch_size, partial_index=shard)
+        return x_list, y
+
     def reset(self):
         self.index_cycle = cycle(self.index)
 
@@ -979,12 +988,15 @@ class CombinedDataGenerator(object):
         df = self.data.df_response.iloc[self.index, :].drop(['Group'], axis=1)
         return df.copy() if copy else df
 
-    def get_slice(self, size=None, contiguous=True, single=False, dataframe=False):
+    def get_slice(self, size=None, contiguous=True, single=False, dataframe=False, partial_index=None):
         size = size or self.size
         single = single or self.data.agg_dose
         target = self.data.agg_dose or 'Growth'
 
-        index = list(islice(self.index_cycle, size))
+        if partial_index is not None:
+            index = partial_index
+        else:
+            index = list(islice(self.index_cycle, size))
         df_orig = self.data.df_response.iloc[index, :]
         df = df_orig.copy()
 

@@ -451,13 +451,13 @@ def run(params):
         else:
             logger.info('Data points per epoch: train = %d, val = %d',train_gen.size, val_gen.size)
             logger.info('Steps per epoch: train = %d, val = %d',train_gen.steps, val_gen.steps)
-            history = model.fit_generator(train_gen.flow(single=args.single), train_gen.steps,
+            history = model.fit_generator(train_gen, train_gen.steps,
                                           epochs=args.epochs,
                                           callbacks=callbacks,
                                           max_queue_size=max_queue_size,
                                           use_multiprocessing=use_multiprocessing,
                                           workers=workers,
-                                          validation_data=val_gen.flow(single=args.single),
+                                          validation_data=val_gen,
                                           validation_steps=val_gen.steps)
 
         if args.cp:
