@@ -8,6 +8,7 @@ import logging
 import os
 import random
 import threading
+import time
 
 import numpy as np
 import pandas as pd
@@ -33,7 +34,7 @@ import uno as benchmark
 import candle_keras as candle
 
 import uno_data
-from uno_data import CombinedDataLoader, CombinedDataGenerator
+from uno_data import CombinedDataLoader, CombinedDataGenerator, NewerDataGenerator
 
 
 logger = logging.getLogger(__name__)
@@ -390,7 +391,7 @@ def run(params):
             model = multi_gpu_model(build_model(loader, args, silent=True), cpu_merge=False, gpus=gpu_count)
             max_queue_size = 10 * gpu_count
             use_multiprocessing = False
-            workers = 2 * gpu_count
+            workers = 1 # * gpu_count
         else:
             model = build_model(loader,args, silent=True)
             max_queue_size = 10
@@ -431,11 +432,14 @@ def run(params):
         if args.tb:
             callbacks.append(tensorboard)
 
-        train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
+        # train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
+        # val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
+        train_gen = NewerDataGenerator(filename='CTRP.h5', batch_size=args.batch_size)
+        val_gen = NewerDataGenerator(partition='val', filename='CTRP.h5', batch_size=args.batch_size)
 
-        df_val = val_gen.get_response(copy=True)
-        y_val = df_val[target].values
+        # df_val = val_gen.get_response(copy=True)
+        # y_val = df_val[target].values
+        y_val = val_gen.get_origin_values()
         y_shuf = np.random.permutation(y_val)
         log_evaluation(evaluate_prediction(y_val, y_shuf),
                        description='Between random pairs in y_val:')
@@ -468,23 +472,25 @@ def run(params):
         if args.no_gen:
             y_val_pred = model.predict(x_val_list, batch_size=args.batch_size)
         else:
-            val_gen.reset()
-            y_val_pred = model.predict_generator(val_gen.flow(single=args.single), val_gen.steps)
+            # val_gen.reset()
+            y_val_pred = model.predict_generator(val_gen, val_gen.steps)
             y_val_pred = y_val_pred[:val_gen.size]
 
         y_val_pred = y_val_pred.flatten()
+        y_val = y_val[0:len(y_val_pred)]
+        print("y_val_pred:", len(y_val_pred), "y_val:", len(y_val))
 
         scores = evaluate_prediction(y_val, y_val_pred)
         log_evaluation(scores)
 
         # df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
-        df_val['Predicted'+target] = y_val_pred
-        df_val[target+'Error'] = y_val_pred-y_val
+        # df_val['Predicted'+target] = y_val_pred
+        # df_val[target+'Error'] = y_val_pred-y_val
 
-        df_pred_list.append(df_val)
+        # df_pred_list.append(df_val)
 
-        plot_history(prefix, history, 'loss')
-        plot_history(prefix, history, 'r2')
+        # plot_history(prefix, history, 'loss')
+        # plot_history(prefix, history, 'r2')
 
     pred_fname = prefix + '.predicted.tsv'
     df_pred = pd.concat(df_pred_list)

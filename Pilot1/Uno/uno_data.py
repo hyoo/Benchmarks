@@ -6,6 +6,7 @@ import logging
 import os
 import pickle
 import sys
+import time
 
 import numpy as np
 import pandas as pd
@@ -939,6 +940,40 @@ class CombinedDataLoader(object):
 
         if cache:
             self.save_to_cache(cache, params)
+
+class NewerDataGenerator(keras.utils.Sequence):
+    def __init__(self, partition='train', filename=None, batch_size=32, shuffle=False):
+        self.partition = partition
+        self.store = pd.HDFStore(filename)
+        y = self.store.select('y_{}'.format(self.partition))
+        self.index = y.index
+        self.index_cycle = cycle(self.index)
+        self.size = len(self.index)
+        self.batch_size = batch_size
+        self.steps = self.size // self.batch_size
+
+    def __len__(self):
+        return self.steps
+
+    def __getitem__(self, idx):
+        index = list(islice(self.index_cycle, self.batch_size))
+        start = index[0]
+        stop = index[-1]
+        x = []
+        for i in range(7):
+            x.append(self.store.select('x_{0}_{1}'.format(self.partition, i), start=start, stop=stop))
+
+        y = self.store.select('y_{}'.format(self.partition), start=start, stop=stop)
+        return x, y
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            self.index = np.random.permutation(index)
+            self.index_cycle = cycle(self.index)
+
+    def get_origin_values(self):
+        return self.store.select('y_{}'.format(self.partition))
+
 
 
 class CombinedDataGenerator(keras.utils.Sequence):
