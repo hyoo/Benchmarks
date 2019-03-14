@@ -953,7 +953,7 @@ class NewerDataGenerator(keras.utils.Sequence):
         self.index = y.index
 
         if self.shuffle:
-            self.index = np.random.permutation(index)
+            self.index = np.random.permutation(self.index)
 
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
@@ -975,7 +975,7 @@ class NewerDataGenerator(keras.utils.Sequence):
 
     def on_epoch_end(self):
         if self.shuffle:
-            self.index = np.random.permutation(index)
+            self.index = np.random.permutation(self.index)
             self.index_cycle = cycle(self.index)
 
     def get_origin_values(self):
