@@ -944,12 +944,19 @@ class CombinedDataLoader(object):
 class NewerDataGenerator(keras.utils.Sequence):
     def __init__(self, partition='train', filename=None, batch_size=32, shuffle=False):
         self.partition = partition
+        self.filename = filename
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
         self.store = pd.HDFStore(filename)
         y = self.store.select('y_{}'.format(self.partition))
         self.index = y.index
+
+        if self.shuffle:
+            self.index = np.random.permutation(index)
+
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
-        self.batch_size = batch_size
         self.steps = self.size // self.batch_size
 
     def __len__(self):

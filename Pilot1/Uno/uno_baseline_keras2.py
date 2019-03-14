@@ -434,8 +434,8 @@ def run(params):
 
         # train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
         # val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        train_gen = NewerDataGenerator(filename='CTRP.h5', batch_size=args.batch_size)
-        val_gen = NewerDataGenerator(partition='val', filename='CTRP.h5', batch_size=args.batch_size)
+        train_gen = NewerDataGenerator(filename='CTRP.h5', batch_size=args.batch_size, shuffle=args.shuffle)
+        val_gen = NewerDataGenerator(partition='val', filename='CTRP.h5', batch_size=args.batch_size, shuffle=args.shuffle)
 
         # df_val = val_gen.get_response(copy=True)
         # y_val = df_val[target].values
