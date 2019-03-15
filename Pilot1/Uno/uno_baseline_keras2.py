@@ -34,7 +34,7 @@ import uno as benchmark
 import candle_keras as candle
 
 import uno_data
-from uno_data import CombinedDataLoader, CombinedDataGenerator, NewerDataGenerator
+from uno_data import CombinedDataLoader, CombinedDataGenerator, DataFeeder
 
 
 logger = logging.getLogger(__name__)
@@ -438,8 +438,8 @@ def run(params):
             callbacks.append(tensorboard)
 
         if args.use_exported_data is not None:
-            train_gen = NewerDataGenerator(filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
-            val_gen = NewerDataGenerator(partition='val', filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+            train_gen = DataFeeder(filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+            val_gen = DataFeeder(partition='val', filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
         else:
             train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
             val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)

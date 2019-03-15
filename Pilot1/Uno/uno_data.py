@@ -941,7 +941,7 @@ class CombinedDataLoader(object):
         if cache:
             self.save_to_cache(cache, params)
 
-class NewerDataGenerator(keras.utils.Sequence):
+class DataFeeder(keras.utils.Sequence):
     def __init__(self, partition='train', filename=None, batch_size=32, shuffle=False):
         self.partition = partition
         self.filename = filename
