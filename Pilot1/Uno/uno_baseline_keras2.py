@@ -8,7 +8,6 @@ import logging
 import os
 import random
 import threading
-import time
 
 import numpy as np
 import pandas as pd
@@ -34,7 +33,7 @@ import uno as benchmark
 import candle_keras as candle
 
 import uno_data
-from uno_data import CombinedDataLoader, CombinedDataGenerator, NewerDataGenerator
+from uno_data import CombinedDataLoader, CombinedDataGenerator, DataFeeder
 
 
 logger = logging.getLogger(__name__)
@@ -344,14 +343,19 @@ def run(params):
                               cell_subset_path=args.cell_subset_path, drug_subset_path=args.drug_subset_path)
         train_gen = CombinedDataGenerator(loader, batch_size=args.batch_size, shuffle=args.shuffle)
         val_gen = CombinedDataGenerator(loader, partition='val', batch_size=args.batch_size, shuffle=args.shuffle)
-        x_train_list, y_train = train_gen.get_slice(size=train_gen.size, dataframe=True, single=args.single)
-        x_val_list, y_val = val_gen.get_slice(size=val_gen.size, dataframe=True, single=args.single)
-        df_train = pd.concat([y_train] + x_train_list, axis=1)
-        df_val = pd.concat([y_val] + x_val_list, axis=1)
-        df = pd.concat([df_train, df_val]).reset_index(drop=True)
-        if args.growth_bins > 1:
-            df = uno_data.discretize(df, 'Growth', bins=args.growth_bins)
-        df.to_csv(fname, sep='\t', index=False, float_format="%.3g")
+        store = pd.HDFStore(fname, complevel=9, complib='blosc:lz4')
+        for partition in ['train', 'val']:
+            gen = train_gen if partition == 'train' else val_gen
+            for i in range(gen.steps):
+                x_list, y = gen.get_slice(size=args.batch_size, dataframe=True, single=args.single)
+
+                for j, input_feature in enumerate(x_list):
+                    input_feature.columns = [''] * len(input_feature.columns)
+                    store.append('x_{}_{}'.format(partition, j), input_feature.astype('float32'), format='table', data_column=True)
+                store.append('y_{}'.format(partition), y[target].astype('float32'), format='table', data_column=True)
+                logger.info('Generating {} dataset. {} / {}'.format(partition, i, gen.steps))
+        store.close()
+        logger.info('Completed generating {}'.format(fname))
         return
 
     loader.partition_data(cv_folds=args.cv, train_split=train_split, val_split=val_split,
@@ -432,16 +436,15 @@ def run(params):
         if args.tb:
             callbacks.append(tensorboard)
 
-        pathname = '/raid/rturgeon/CTRP.h5'
+        if args.use_exported_data is not None:
+            train_gen = DataFeeder(loader, filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+            val_gen = DataFeeder(loader, partition='val', filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+        else:
+            train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
+            val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
 
-        # train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        # val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        train_gen = NewerDataGenerator(loader, filename=pathname, batch_size=args.batch_size, shuffle=args.shuffle)
-        val_gen   = NewerDataGenerator(loader, partition='val', filename=pathname, batch_size=args.batch_size, shuffle=args.shuffle)
-
-        df_val = val_gen.get_response(copy=True)
+        df_val = val_gen.get_dataframe()
         y_val = df_val[target].values
-        y_val = val_gen.get_origin_values()
         y_shuf = np.random.permutation(y_val)
         log_evaluation(evaluate_prediction(y_val, y_shuf),
                        description='Between random pairs in y_val:')
@@ -475,31 +478,29 @@ def run(params):
             y_val_pred = model.predict(x_val_list, batch_size=args.batch_size)
         else:
             val_gen.reset()
-            y_val_pred = model.predict_generator(val_gen, val_gen.steps)
+            y_val_pred = model.predict_generator(val_gen, val_gen.steps+1)
             y_val_pred = y_val_pred[:val_gen.size]
 
         y_val_pred = y_val_pred.flatten()
-        y_val = y_val[0:len(y_val_pred)]
-        print("y_val_pred:", len(y_val_pred), "y_val:", len(y_val))
 
         scores = evaluate_prediction(y_val, y_val_pred)
         log_evaluation(scores)
-### RRT
+
         df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
         df_val['Predicted'+target] = y_val_pred
         df_val[target+'Error'] = y_val_pred-y_val
-
         df_pred_list.append(df_val)
 
-        # plot_history(prefix, history, 'loss')
-        # plot_history(prefix, history, 'r2')
+        plot_history(prefix, history, 'loss')
+        plot_history(prefix, history, 'r2')
 
     pred_fname = prefix + '.predicted.tsv'
     df_pred = pd.concat(df_pred_list)
     if args.agg_dose:
         df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', target], inplace=True)
     else:
-        df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
+        # df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
+        df_pred.sort_values(['Growth'], inplace=True)
     df_pred.to_csv(pred_fname, sep='\t', index=False, float_format='%.4g')
 
     if args.cv > 1:
