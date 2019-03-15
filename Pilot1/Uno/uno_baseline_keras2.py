@@ -437,10 +437,12 @@ def run(params):
         if args.tb:
             callbacks.append(tensorboard)
 
-        # train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        # val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        train_gen = NewerDataGenerator(filename='CTRP.h5', batch_size=args.batch_size, shuffle=args.shuffle)
-        val_gen = NewerDataGenerator(partition='val', filename='CTRP.h5', batch_size=args.batch_size, shuffle=args.shuffle)
+        if args.use_exported_data is not None:
+            train_gen = NewerDataGenerator(filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+            val_gen = NewerDataGenerator(partition='val', filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+        else:
+            train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
+            val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
 
         # df_val = val_gen.get_response(copy=True)
         # y_val = df_val[target].values
