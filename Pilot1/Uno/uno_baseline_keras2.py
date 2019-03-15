@@ -432,13 +432,15 @@ def run(params):
         if args.tb:
             callbacks.append(tensorboard)
 
+        pathname = '/raid/rturgeon/CTRP.h5'
+
         # train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
         # val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
-        train_gen = NewerDataGenerator(filename='CTRP.h5', batch_size=args.batch_size, shuffle=args.shuffle)
-        val_gen = NewerDataGenerator(partition='val', filename='CTRP.h5', batch_size=args.batch_size, shuffle=args.shuffle)
+        train_gen = NewerDataGenerator(loader, filename=pathname, batch_size=args.batch_size, shuffle=args.shuffle)
+        val_gen   = NewerDataGenerator(loader, partition='val', filename=pathname, batch_size=args.batch_size, shuffle=args.shuffle)
 
-        # df_val = val_gen.get_response(copy=True)
-        # y_val = df_val[target].values
+        df_val = val_gen.get_response(copy=True)
+        y_val = df_val[target].values
         y_val = val_gen.get_origin_values()
         y_shuf = np.random.permutation(y_val)
         log_evaluation(evaluate_prediction(y_val, y_shuf),
@@ -472,7 +474,7 @@ def run(params):
         if args.no_gen:
             y_val_pred = model.predict(x_val_list, batch_size=args.batch_size)
         else:
-            # val_gen.reset()
+            val_gen.reset()
             y_val_pred = model.predict_generator(val_gen, val_gen.steps)
             y_val_pred = y_val_pred[:val_gen.size]
 
@@ -482,12 +484,12 @@ def run(params):
 
         scores = evaluate_prediction(y_val, y_val_pred)
         log_evaluation(scores)
+### RRT
+        df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
+        df_val['Predicted'+target] = y_val_pred
+        df_val[target+'Error'] = y_val_pred-y_val
 
-        # df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
-        # df_val['Predicted'+target] = y_val_pred
-        # df_val[target+'Error'] = y_val_pred-y_val
-
-        # df_pred_list.append(df_val)
+        df_pred_list.append(df_val)
 
         # plot_history(prefix, history, 'loss')
         # plot_history(prefix, history, 'r2')

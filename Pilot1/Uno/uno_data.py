@@ -942,7 +942,8 @@ class CombinedDataLoader(object):
             self.save_to_cache(cache, params)
 
 class NewerDataGenerator(keras.utils.Sequence):
-    def __init__(self, partition='train', filename=None, batch_size=32, shuffle=False):
+    def __init__(self, loader, partition='train', filename=None, batch_size=32, shuffle=False):
+        self.data = loader
         self.partition = partition
         self.filename = filename
         self.batch_size = batch_size
@@ -981,7 +982,12 @@ class NewerDataGenerator(keras.utils.Sequence):
     def get_origin_values(self):
         return self.store.select('y_{}'.format(self.partition))
 
+    def get_response(self, copy=False):
+        df = self.data.df_response.iloc[self.index, :].drop(['Group'], axis=1)
+        return df.copy() if copy else df
 
+    def reset(self):
+        self.index_cycle = cycle(self.index)
 
 class CombinedDataGenerator(keras.utils.Sequence):
     """Generate training, validation or testing batches from loaded data
