@@ -344,14 +344,19 @@ def run(params):
                               cell_subset_path=args.cell_subset_path, drug_subset_path=args.drug_subset_path)
         train_gen = CombinedDataGenerator(loader, batch_size=args.batch_size, shuffle=args.shuffle)
         val_gen = CombinedDataGenerator(loader, partition='val', batch_size=args.batch_size, shuffle=args.shuffle)
-        x_train_list, y_train = train_gen.get_slice(size=train_gen.size, dataframe=True, single=args.single)
-        x_val_list, y_val = val_gen.get_slice(size=val_gen.size, dataframe=True, single=args.single)
-        df_train = pd.concat([y_train] + x_train_list, axis=1)
-        df_val = pd.concat([y_val] + x_val_list, axis=1)
-        df = pd.concat([df_train, df_val]).reset_index(drop=True)
-        if args.growth_bins > 1:
-            df = uno_data.discretize(df, 'Growth', bins=args.growth_bins)
-        df.to_csv(fname, sep='\t', index=False, float_format="%.3g")
+        store = pd.HDFStore(fname, complevel=9, complib='blosc:lz4')
+        for partition in ['train', 'val']:
+            gen = train_gen if partition == 'train' else val_gen
+            for i in range(gen.steps):
+                x_list, y = gen.get_slice(size=args.batch_size, dataframe=True, single=args.single)
+
+                for j, input_feature in enumerate(x_list):
+                    input_feature.columns = [''] * len(input_feature.columns)
+                    store.append('x_{}_{}'.format(partition, j), input_feature.astype('float32'), format='table', data_column=True)
+                store.append('y_{}'.format(partition), y[target].astype('float32'), format='table', data_column=True)
+                logger.info('Generating {} dataset. {} / {}'.format(partition, i, gen.steps))
+        store.close()
+        logger.info('Completed generating {}'.format(fname))
         return
 
     loader.partition_data(cv_folds=args.cv, train_split=train_split, val_split=val_split,
