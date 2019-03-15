@@ -978,8 +978,11 @@ class DataFeeder(keras.utils.Sequence):
             self.index = np.random.permutation(self.index)
             self.index_cycle = cycle(self.index)
 
-    def get_origin_values(self):
-        return self.store.select('y_{}'.format(self.partition))
+    def reset(self):
+        pass
+
+    def get_dataframe(self):
+        return self.store.get('y_{}'.format(self.partition)).to_frame()
 
 
 

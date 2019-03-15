@@ -8,7 +8,6 @@ import logging
 import os
 import random
 import threading
-import time
 
 import numpy as np
 import pandas as pd
@@ -444,9 +443,8 @@ def run(params):
             train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
             val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
 
-        # df_val = val_gen.get_response(copy=True)
-        # y_val = df_val[target].values
-        y_val = val_gen.get_origin_values()
+        df_val = val_gen.get_dataframe()
+        y_val = df_val[target].values
         y_shuf = np.random.permutation(y_val)
         log_evaluation(evaluate_prediction(y_val, y_shuf),
                        description='Between random pairs in y_val:')
@@ -479,32 +477,31 @@ def run(params):
         if args.no_gen:
             y_val_pred = model.predict(x_val_list, batch_size=args.batch_size)
         else:
-            # val_gen.reset()
-            y_val_pred = model.predict_generator(val_gen, val_gen.steps)
+            val_gen.reset()
+            y_val_pred = model.predict_generator(val_gen, val_gen.steps+1)
             y_val_pred = y_val_pred[:val_gen.size]
 
         y_val_pred = y_val_pred.flatten()
-        y_val = y_val[0:len(y_val_pred)]
-        print("y_val_pred:", len(y_val_pred), "y_val:", len(y_val))
 
         scores = evaluate_prediction(y_val, y_val_pred)
         log_evaluation(scores)
 
-        # df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
-        # df_val['Predicted'+target] = y_val_pred
-        # df_val[target+'Error'] = y_val_pred-y_val
+        df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
+        df_val['Predicted'+target] = y_val_pred
+        df_val[target+'Error'] = y_val_pred-y_val
 
-        # df_pred_list.append(df_val)
+        df_pred_list.append(df_val)
 
-        # plot_history(prefix, history, 'loss')
-        # plot_history(prefix, history, 'r2')
+        plot_history(prefix, history, 'loss')
+        plot_history(prefix, history, 'r2')
 
     pred_fname = prefix + '.predicted.tsv'
     df_pred = pd.concat(df_pred_list)
     if args.agg_dose:
         df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', target], inplace=True)
     else:
-        df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
+        # df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
+        df_pred.sort_values(['Growth'], inplace=True)
     df_pred.to_csv(pred_fname, sep='\t', index=False, float_format='%.4g')
 
     if args.cv > 1:
