@@ -352,7 +352,8 @@ def run(params):
                 for j, input_feature in enumerate(x_list):
                     input_feature.columns = [''] * len(input_feature.columns)
                     store.append('x_{}_{}'.format(partition, j), input_feature.astype('float32'), format='table', data_column=True)
-                store.append('y_{}'.format(partition), y[target].astype('float32'), format='table', data_column=True)
+                y[target] = y[target].astype('float32')
+                store.append('y_{}'.format(partition), y, format='table', data_column=True)
                 logger.info('Generating {} dataset. {} / {}'.format(partition, i, gen.steps))
         store.close()
         logger.info('Completed generating {}'.format(fname))
@@ -443,7 +444,7 @@ def run(params):
             train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
             val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
 
-        df_val = val_gen.get_dataframe()
+        df_val = val_gen.get_response()
         y_val = df_val[target].values
         y_shuf = np.random.permutation(y_val)
         log_evaluation(evaluate_prediction(y_val, y_shuf),
@@ -500,7 +501,7 @@ def run(params):
         df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', target], inplace=True)
     else:
         # df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
-        df_pred.sort_values(['Growth'], inplace=True)
+        df_pred.sort_values(['Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
     df_pred.to_csv(pred_fname, sep='\t', index=False, float_format='%.4g')
 
     if args.cv > 1:
