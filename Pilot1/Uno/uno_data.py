@@ -942,6 +942,8 @@ class CombinedDataLoader(object):
             self.save_to_cache(cache, params)
 
 class DataFeeder(keras.utils.Sequence):
+    """Read from pre-joined dataset (HDF5 format) and feed data to the model.
+    """
     def __init__(self, loader, partition='train', filename=None, batch_size=32, shuffle=False):
         self.data = loader
         self.partition = partition
@@ -952,10 +954,6 @@ class DataFeeder(keras.utils.Sequence):
         self.store = pd.HDFStore(filename)
         y = self.store.select('y_{}'.format(self.partition))
         self.index = y.index
-
-        if self.shuffle:
-            self.index = np.random.permutation(self.index)
-
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
         self.steps = self.size // self.batch_size
@@ -982,17 +980,14 @@ class DataFeeder(keras.utils.Sequence):
     def reset(self):
         pass
 
-    def get_response(self):
+    def get_response(self, copy=False):
         df = self.store.get('y_{}'.format(self.partition))
         df_dose1 = self.store.get('x_{}_0'.format(self.partition))
         df_dose2 = self.store.get('x_{}_1'.format(self.partition))
         df['Dose1'] = df_dose1
         df['Dose2'] = df_dose2
-        return df
-
-    def get_response(self, copy=False):
-        df = self.data.df_response.iloc[self.index, :].drop(['Group'], axis=1)
         return df.copy() if copy else df
+
 
 class CombinedDataGenerator(keras.utils.Sequence):
     """Generate training, validation or testing batches from loaded data
