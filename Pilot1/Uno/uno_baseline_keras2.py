@@ -343,7 +343,7 @@ def run(params):
                               cell_subset_path=args.cell_subset_path, drug_subset_path=args.drug_subset_path)
         train_gen = CombinedDataGenerator(loader, batch_size=args.batch_size, shuffle=args.shuffle)
         val_gen = CombinedDataGenerator(loader, partition='val', batch_size=args.batch_size, shuffle=args.shuffle)
-        store = pd.HDFStore(fname, complevel=9, complib='blosc:lz4')
+        store = pd.HDFStore(fname, complevel=9, complib='blosc:snappy')
         for partition in ['train', 'val']:
             gen = train_gen if partition == 'train' else val_gen
             for i in range(gen.steps):
