@@ -288,6 +288,16 @@ def initialize_parameters():
 
     return gParameters
 
+def report_duplicates(as_list, as_set, name='list'):
+    copy_set  = as_set.copy()
+    sort_list = as_list[:]
+    sort_list.sort()
+
+    for mem in sort_list:
+        if mem in copy_set:
+            copy_set -= {mem}
+        else:
+            print('   member: %s appears multiple times in %s' % (mem, name)) 
 
 class Struct:
     def __init__(self, **entries):
@@ -335,30 +345,200 @@ def run(params):
     target = args.agg_dose or 'Growth'
     val_split = args.validation_split
     train_split = 1 - val_split
-
+        
+    # 
+    # Export training and validation data to HDFStore 
+    #
     if args.export_data:
-        fname = args.export_data
+        export_data_fname = args.export_data
+
         loader.partition_data(cv_folds=args.cv, train_split=train_split, val_split=val_split,
                               cell_types=args.cell_types, by_cell=args.by_cell, by_drug=args.by_drug,
                               cell_subset_path=args.cell_subset_path, drug_subset_path=args.drug_subset_path)
-        train_gen = CombinedDataGenerator(loader, batch_size=args.batch_size, shuffle=args.shuffle)
-        val_gen = CombinedDataGenerator(loader, partition='val', batch_size=args.batch_size, shuffle=args.shuffle)
-        store = pd.HDFStore(fname, complevel=9, complib='blosc:snappy')
+        
+        train_gen = CombinedDataGenerator(loader, partition='train', batch_size=args.batch_size, shuffle=args.shuffle)
+        val_gen   = CombinedDataGenerator(loader, partition='val',   batch_size=args.batch_size, shuffle=args.shuffle)
+
+        # Loader extensions supporting pre-joined source data
+        # cell_feature_names is a list of all feature_names (columns)  associated with feature_set == 2 - named 'cell.rnaseq'
+        # That file is stored as '<--export_data>.rnaseq'
+
+        loader.cell_feature_names = None
+        cell_feature_names_container = 'rnaseq'
+        cell_feature_names_filename  = '{}.{}_names'.format(export_data_fname, cell_feature_names_container) 
+            
+        if os.path.exists(export_data_fname):
+            os.remove(export_data_fname)
+
+        # Store the the examples presented by the DataGenerator using pandas HDFStore
+        # Each feature_set (a collection of feature colums) is stored under a distinct key
+        # The 'cell_rnaseq' feature set is stored in chunks to address HDFStore column capacity limitations
+
+        store = pd.HDFStore(export_data_fname, complevel=9, complib='blosc:snappy')
+
         for partition in ['train', 'val']:
             gen = train_gen if partition == 'train' else val_gen
             for i in range(gen.steps):
                 x_list, y = gen.get_slice(size=args.batch_size, dataframe=True, single=args.single)
-
                 for j, input_feature in enumerate(x_list):
+                    input_feature = input_feature.astype('float32')     # commonality 
+                    store_key = 'x_{}_{}'.format(partition, j)          # HDFStore key, major 
+                   
+                    # cell_rnaseq names are stored in their own HDFS metadata file. 
+                    # The saved names allow for feature set construction / gene selection by name  
+                    # ??? 8-fold row repetition - why is this occurring                     ???????????????????????????????
+                    
+                    if j == 2:                                          # ugly ugly ugly ugly ugly ugly
+                        if not loader.cell_feature_names:
+                            loader.cell_feature_names = input_feature.columns[:].tolist()
+                            colnames   = [cell_feature_names_container]
+                            df_feature = pd.DataFrame(loader.cell_feature_names, columns=colnames)
+                            pd_store   = pd.HDFStore(cell_feature_names_filename)
+                            pd_store.put('feature_names', df_feature)
+                            pd_store.close()
+
+                        # The full cell descriptor is too wide for direct HDFS H5 representation, 
+                        # Break it up into gulp_size chunks and write each independently.
+                        # The column names are replaced with null-strings because (1) the
+                        # header storage space is limitted and (2) they are not needed 
+
+                        if True:
+                            gulp_size   = 4096
+                            _, nbr_cols = input_feature.shape
+                            nbr_passes  = (nbr_cols + gulp_size - 1) // gulp_size
+                            
+                            for curr in range(nbr_passes): 
+                                store_subkey = '{}_{}'.format(store_key, curr)      # HDFStore key, minor
+                                colorg = gulp_size * curr
+                                colfin = colorg + gulp_size    
+                                subset = input_feature.iloc[:, colorg:colfin]
+                                subset.columns = [''] * len(subset.columns)
+                                store.append(store_subkey, subset, format='table')  # store sharded feature_set  
+                            continue
+
+                    # store standard feature set 
+                    # minimize the contribution of unneeded column names to 64K HDFStore header size limit
+
                     input_feature.columns = [''] * len(input_feature.columns)
-                    store.append('x_{}_{}'.format(partition, j), input_feature.astype('float32'), format='table', data_column=True)
-                store.append('y_{}'.format(partition), y.astype({target:'float32'}), format='table', data_column=True,
+                    store.append(store_key, input_feature, format='table')
+
+                # store labels
+                store.append('y_{}'.format(partition), y.astype({target:'float32'}), format='table',
                         min_itemsize={'Sample':30, 'Drug1':10, 'Drug2':10})
+
                 logger.info('Generating {} dataset. {} / {}'.format(partition, i, gen.steps))
+
+                ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST 
+                ### Read back and reassemble the feature sets written above. It is easier to test
+                ### constructs here than in DataFeeder::__getitem__
+              
+               #"""
+                if i == 0:
+                    x = []
+                    for j in range(7):
+                        store_key = 'x_{}_{}'.format(partition, j)    
+                        if j != 2:
+                            t = store.select(store_key, start=0, stop=4096)
+                            x.append(t)
+                        else:
+                            i = 0
+                            df_accum = pd.DataFrame()
+                            while True:
+                                try:
+                                    store_subkey = '{}_{}'.format(store_key, i)
+                                    t = store.select(store_subkey, start=0, stop=4096)
+                                except KeyError:
+                                    break
+                                df_accum = pd.concat([df_accum, t], axis=1)
+                                i += 1
+                            x.append(df_accum)
+                    y = store.select('y_{}'.format(partition))['Growth'] 
+               #"""
+                ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST ### TEST 
+        # cleanup
         store.close()
-        logger.info('Completed generating {}'.format(fname))
+
+        logger.info('Completed generating {}'.format(export_data_fname))
         return
 
+    #----------------------------------------------------------------------------------------------    
+
+    # Define additional loader attributes supporting dynamic feature-set content selection
+
+    loader.cell_feature_names = None
+    loader.feature_selections = None
+    loader.feature_selection_xref = None
+    
+    # If training/evaluating with previously exported data, recover the names of the individual
+    # features (genes) associated with the cell_rnaseq feature set from its metadata file 
+    
+    if args.use_exported_data:
+        filename = args.use_exported_data + '.rnaseq_names'
+        if not os.path.exists(filename):
+            sys.exit("Feature name file: %s not found" % filename)
+
+        pd_store  = pd.HDFStore(filename)
+        names     = pd_store.get('feature_names')
+        name_list = names.iloc[:,0].tolist()
+        loader.cell_feature_names = {key:seq for (seq, key) in enumerate(name_list)}
+        pd_store.close()
+
+    # The 'cell_features_list' argument can be specified with 'use_exported_data' to define
+    # a subset of features (genes) from the complete 'cell_rnaseq' feature set. It is optional,
+    # however, and all features are selected in the absence of that arg.
+    # The cell_features_list is case sensitive. 
+
+    if args.cell_features_list:
+        if not args.use_exported_data:
+            sys.exit('Feature selection lists are only available with use_exported_data')
+
+        featfile = args.cell_features_list
+        if not os.path.exists(featfile):
+            sys.exit("Cell feature selection file: %s not found" % featfile)
+        
+        with open(featfile) as f:
+            text_list = f.readlines()
+        
+        loader.feature_selections = [line.strip() for line in text_list]
+        loader.feature_selections = [line for line in loader.feature_selections if line != '']
+
+        select_len = len(loader.feature_selections)
+        if select_len == 0:
+            sys.exit("The feature selection list: %s is empty" % featfile)
+
+        # Duplicate feature names are allowed but most likely indicate a feature selection file error
+        # Report all duplicate names (could be difficult to spot without programmed assistance)
+
+        feature_set = set(loader.feature_selections)
+        if len(feature_set) != select_len:
+            print('The cell_features_list contains duplicate entries')
+            report_duplicates(as_list=loader.feature_selections, as_set=feature_set, name=featfile)
+    
+        # replace raw 'cell.rnaseq' width with that of the 'selected features' list
+
+        loader.feature_shapes['cell.rnaseq'] = (select_len,)
+
+        # Construct feature_selection_xref list. Each entry contains an index into the full 
+        # cell_rnaseq feature array. It is an error if a selected feature name cannot be matched
+        # to the base feature set.
+
+        berror = False
+        loader.feature_selection_xref = []
+
+        for selection in loader.feature_selections:
+            featndx = loader.cell_feature_names.get(selection)
+            if featndx:  
+                loader.feature_selection_xref.append(featndx)
+            else:
+                berror = True
+                logging.error('selected feature: %s not found' % selection)
+
+        if berror:
+            sys.exit('Terminating due to error')
+
+    #
+    # Build the model 
+    #
     loader.partition_data(cv_folds=args.cv, train_split=train_split, val_split=val_split,
                           cell_types=args.cell_types, by_cell=args.by_cell, by_drug=args.by_drug,
                           cell_subset_path=args.cell_subset_path, drug_subset_path=args.drug_subset_path)
@@ -368,6 +548,9 @@ def run(params):
     model.summary(print_fn=logger.info)
     # plot_model(model, to_file=prefix+'.model.png', show_shapes=True)
 
+    #
+    #
+    #
     if args.cp:
         model_json = model.to_json()
         with open(prefix+'.model.json', 'w') as f:
@@ -438,8 +621,9 @@ def run(params):
             callbacks.append(tensorboard)
 
         if args.use_exported_data is not None:
-            train_gen = DataFeeder(loader, filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
-            val_gen = DataFeeder(loader, partition='val', filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle)
+            data_arg  = args.use_exported_data
+            train_gen = DataFeeder(loader, partition='train', datafile=data_arg, batch_size=args.batch_size, shuffle=args.shuffle)
+            val_gen = DataFeeder(loader, partition='val', datafile=data_arg, batch_size=args.batch_size, shuffle=args.shuffle)
         else:
             train_gen = CombinedDataGenerator(loader, fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)
             val_gen = CombinedDataGenerator(loader, partition='val', fold=fold, batch_size=args.batch_size, shuffle=args.shuffle)

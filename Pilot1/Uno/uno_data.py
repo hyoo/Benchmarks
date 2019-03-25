@@ -944,33 +944,58 @@ class CombinedDataLoader(object):
 class DataFeeder(keras.utils.Sequence):
     """Read from pre-joined dataset (HDF5 format) and feed data to the model.
     """
-    def __init__(self, loader, partition='train', filename=None, batch_size=32, shuffle=False):
+    def __init__(self, loader, partition='train', datafile=None, batch_size=32, shuffle=False):
         self.data = loader
         self.partition = partition
-        self.filename = filename
+        self.datafile = datafile
         self.batch_size = batch_size
         self.shuffle = shuffle
 
-        self.store = pd.HDFStore(filename)
+        self.store = pd.HDFStore(datafile)
         y = self.store.select('y_{}'.format(self.partition))
         self.index = y.index
         self.index_cycle = cycle(self.index)
         self.size = len(self.index)
         self.steps = self.size // self.batch_size
 
-    def __len__(self):
-        return self.steps
-
     def __getitem__(self, idx):
-        index = list(islice(self.index_cycle, self.batch_size))
-        start = index[0]
-        stop = index[-1]
+        index  = list(islice(self.index_cycle, self.batch_size))
+        loader = self.data
+        start  = index[0]
+        stop   = index[-1]
         x = []
+
+        #
         for i in range(7):
-            x.append(self.store.select('x_{0}_{1}'.format(self.partition, i), start=start, stop=stop))
+            store_key = 'x_{0}_{1}'.format(self.partition, i)
+            if i != 2:
+                x.append(self.store.select(store_key, start=start, stop=stop))
+            else:
+                i = 0
+                df_accum = pd.DataFrame()
+                while True:
+                    store_subkey = '{}_{}'.format(store_key, i)
+                    try:
+                        t = self.store.select(store_subkey, start=start, stop=stop)
+                    except KeyError:
+                        break        
+                    df_accum = pd.concat([df_accum, t], axis=1)   
+                    i += 1
+
+                #
+                if not loader.feature_selection_xref:
+                    x.append(df_accum)
+                else:
+                    df_extract = pd.DataFrame()
+                    for i, ndx in enumerate(loader.feature_selection_xref):
+                        df_extract[i] = df_accum.iloc[:, ndx]
+                    x.append(df_extract)
 
         y = self.store.select('y_{}'.format(self.partition), start=start, stop=stop)['Growth']
         return x, y
+
+    def __len__(self):
+        return self.steps
 
     def on_epoch_end(self):
         if self.shuffle:
