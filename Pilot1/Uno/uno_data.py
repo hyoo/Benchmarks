@@ -954,15 +954,21 @@ class DataFeeder(keras.utils.Sequence):
         self.store = pd.HDFStore(datafile)
         y = self.store.select('y_{}'.format(self.partition))
         self.index = y.index
-        self.index_cycle = cycle(self.index)
         self.size = len(self.index)
         self.steps = self.size // self.batch_size
+        self.index_map = np.arange(self.steps)
+        if self.shuffle:
+            np.random.shuffle(self.index_map)
 
     def __getitem__(self, idx):
-        index  = list(islice(self.index_cycle, self.batch_size))
+###     index  = list(islice(self.index_cycle, self.batch_size))
+###     start  = index[0]
+###     stop   = index[-1]
+        _idx = self.index_map[idx]
+        start = _idx * self.batch_size
+        stop = start + self.batch_size
+        
         loader = self.data
-        start  = index[0]
-        stop   = index[-1]
         x = []
 
         #
@@ -991,7 +997,7 @@ class DataFeeder(keras.utils.Sequence):
                         df_extract[i] = df_accum.iloc[:, ndx]
                     x.append(df_extract)
 
-        y = self.store.select('y_{}'.format(self.partition), start=start, stop=stop)['Growth']
+        y = self.store.select('y_{}'.format(self.partition), start=start, stop=stop, columns=['Growth'])
         return x, y
 
     def __len__(self):
@@ -999,8 +1005,7 @@ class DataFeeder(keras.utils.Sequence):
 
     def on_epoch_end(self):
         if self.shuffle:
-            self.index = np.random.permutation(self.index)
-            self.index_cycle = cycle(self.index)
+            np.random.shuffle(self.index_map)
 
     def reset(self):
         pass
