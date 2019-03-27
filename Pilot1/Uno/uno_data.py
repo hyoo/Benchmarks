@@ -617,9 +617,68 @@ def values_or_dataframe(df, contiguous=False, dataframe=False):
     return mat
 
 
+def read_feature_set_and_labels(
+    nbr_features = None, 
+    cell_feature_ndx = None,        # optional 
+    loader    = None,
+    partition = None,
+    HDFStore  = None,
+    start = None, 
+    stop  = None
+):
+    x = []
+
+    # reassemble feature sets
+    for i in range(nbr_features):
+        store_key = 'x_{0}_{1}'.format(partition, i)
+
+        if i != cell_feature_ndx:
+            x.append(HDFStore.select(store_key, start=start, stop=stop))
+        else:
+            segnbr = 0
+            df_accum = pd.DataFrame()
+            while True:
+                store_subkey = '{}_{}'.format(store_key, segnbr)
+                try:
+                    t = HDFStore.select(store_subkey, start=start, stop=stop)
+                except KeyError:
+                    break        
+                df_accum = pd.concat([df_accum, t], axis=1)   
+                segnbr += 1
+
+            # extract selected columns from full feature set
+            if not loader.feature_selection_xref:
+                x.append(df_accum)
+            else:
+                df_extract = pd.DataFrame()
+                for k, ndx in enumerate(loader.feature_selection_xref):
+                    df_extract[k] = df_accum.iloc[:, ndx]
+                x.append(df_extract)
+
+    # acquire labels
+    y = HDFStore.select('y_{}'.format(partition), start=start, stop=stop, columns=['Growth'])
+    
+    return x,y
+
+
+def identify_duplicates(as_list, as_set, name='list'):
+    """ identify duplicates in as_list iterable using as_set set """
+    copy_set  = as_set.copy()
+    sort_list = as_list[:]
+    sort_list.sort()
+
+    for mem in sort_list:
+        if mem in copy_set:
+            copy_set -= {mem}
+        else:
+            print('   member: %s appears multiple times in %s' % (mem, name)) 
+
 class CombinedDataLoader(object):
     def __init__(self, seed=SEED):
         self.seed = seed
+        self.cell_feature_names = None          # a list of all cell.rnaseq feature names
+        self.feature_selections = None          # a list of all cell.rnaseq feature names selected
+        self.feature_selection_xref = None      # x list xrefing selected names to all nams
 
     def load_from_cache(self, cache, params):
         param_fname = '{}.params.json'.format(cache)
@@ -793,6 +852,46 @@ class CombinedDataLoader(object):
             logger.info('  {}: {}'.format(k, self.feature_shapes[v]))
         logger.info('Total input dimensions: {}'.format(self.input_dim))
 
+
+    def select_cell_features(self, feature_filename):
+        with open(feature_filename) as f:
+            text_list = f.readlines()
+        
+        self.feature_selections = [line.strip() for line in text_list]
+        self.feature_selections = [line for line in self.feature_selections if line != '']
+
+        select_len = len(self.feature_selections)
+        if select_len == 0:
+            sys.exit("The feature selection list: %s is empty" % feature_filename)
+
+        # Duplicate feature names are allowed but most likely indicate a feature selection file error
+        # Report all duplicate names (could be difficult to spot without programmed assistance)
+
+        feature_set = set(self.feature_selections)
+        if len(feature_set) != select_len:
+            logger.warn('The cell_features_list contains duplicate entries')
+            identify_duplicates(as_list=self.feature_selections, as_set=feature_set, name=feature_filename)
+    
+        # replace raw 'cell.rnaseq' width with that of the 'selected features' list
+        self.feature_shapes['cell.rnaseq'] = (select_len,)
+
+        # Construct feature_selection_xref list. Each entry contains an index into the full 
+        # cell_rnaseq feature array. It is an error if a selected feature name cannot be matched
+        
+        berror = False
+        self.feature_selection_xref = []
+
+        for selection in self.feature_selections:
+            featndx = self.cell_feature_names.get(selection)
+            if featndx:  
+                self.feature_selection_xref.append(featndx)
+            else:
+                berror = True
+                logger.error('Selected feature: %s not found' % selection)
+
+        if berror:
+            sys.exit('Terminating due to error')
+
     def load(self, cache=None, ncols=None, scaling='std', dropna=None,
              agg_dose=None, embed_feature_source=True, encode_response_source=True,
              cell_features=['rnaseq'], drug_features=['descriptors', 'fingerprints'],
@@ -960,44 +1059,30 @@ class DataFeeder(keras.utils.Sequence):
         if self.shuffle:
             np.random.shuffle(self.index_map)
 
+        input_feature_list = [fname for fname in loader.input_features]
+        self.feature_set_count = len(input_feature_list)
+        self.cell_rnaseq_ndx = None
+        if input_feature_list.count('cell.rnaseq') > 0:
+            self.cell_rnaseq_ndx = input_feature_list.index('cell.rnaseq')
+
+        self.gets = 0 # ???????????????????????????????????????????
+
     def __getitem__(self, idx):
-###     index  = list(islice(self.index_cycle, self.batch_size))
-###     start  = index[0]
-###     stop   = index[-1]
         _idx = self.index_map[idx]
         start = _idx * self.batch_size
         stop = start + self.batch_size
-        
         loader = self.data
-        x = []
 
-        #
-        for i in range(7):
-            store_key = 'x_{0}_{1}'.format(self.partition, i)
-            if i != 2:
-                x.append(self.store.select(store_key, start=start, stop=stop))
-            else:
-                i = 0
-                df_accum = pd.DataFrame()
-                while True:
-                    store_subkey = '{}_{}'.format(store_key, i)
-                    try:
-                        t = self.store.select(store_subkey, start=start, stop=stop)
-                    except KeyError:
-                        break        
-                    df_accum = pd.concat([df_accum, t], axis=1)   
-                    i += 1
-
-                #
-                if not loader.feature_selection_xref:
-                    x.append(df_accum)
-                else:
-                    df_extract = pd.DataFrame()
-                    for i, ndx in enumerate(loader.feature_selection_xref):
-                        df_extract[i] = df_accum.iloc[:, ndx]
-                    x.append(df_extract)
-
-        y = self.store.select('y_{}'.format(self.partition), start=start, stop=stop, columns=['Growth'])
+        x, y = read_feature_set_and_labels(
+            nbr_features = self.feature_set_count,
+            cell_feature_ndx = self.cell_rnaseq_ndx,
+            loader = self.data,
+            partition = self.partition,
+            HDFStore  = self.store,
+            start = start,
+            stop  = stop
+        )    
+        self.gets += 1  # ?????????????????????????????????????????
         return x, y
 
     def __len__(self):
