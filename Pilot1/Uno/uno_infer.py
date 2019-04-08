@@ -42,13 +42,37 @@ def main():
 
     model.summary()
 
-    y_test_pred = model.predict_generator(test_gen, test_gen.steps)
-    y_test_pred = y_test_pred.flatten()
+    cv_pred_list = []
+    cv_y_list = []
+    df_pred_list = []
+    cv_stats = {'mae': [], 'mse': [], 'r2': [], 'corr': []}
+    for cv in range(args.n_pred):
+        cv_pred = []
+        dataset = ['train', 'val'] if args.partition == 'all' else [args.partition]
+        for partition in dataset:
+            test_gen = DataFeeder(filename=args.data, partition=partition, batch_size=1024)
+            y_test_pred = model.predict_generator(test_gen, test_gen.steps)
+            y_test_pred = y_test_pred.flatten()
 
-    df_y = test_gen.get_response(copy=True)
-    y_test = df_y['Growth'].values
-    scores = evaluate_prediction(y_test, y_test_pred)
-    log_evaluation(scores, description='Testing on data from {} ({})'.format(args.data, len(y_test_pred)))
+            df_y = test_gen.get_response(copy=True)
+            y_test = df_y['Growth'].values
+
+            df_pred = df_y.assign(PredictedGrowth=y_test_pred, GrowthError=y_test_pred - y_test)
+            df_pred_list.append(df_pred)
+            test_gen.close()
+
+            if cv == 0:
+                cv_y_list.append(df_y)
+            cv_pred.append(y_test_pred)
+        cv_pred_list.append(np.concatenate(cv_pred))
+
+        # calcuate stats for mse, mae, r2, corr
+        scores = evaluate_prediction(df_pred['Growth'], df_pred['PredictedGrowth'])
+        # log_evaluation(scores, description=cv)
+        [cv_stats[key].append(scores[key]) for key in scores.keys()]
+
+    df_pred = pd.concat(df_pred_list)
+    cv_y = pd.concat(cv_y_list)
 
     # save to tsv
     df_pred = df_y.assign(PredictedGrowth=y_test_pred, GrowthError=y_test_pred-y_test)

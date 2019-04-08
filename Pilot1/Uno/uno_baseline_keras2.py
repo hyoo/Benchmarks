@@ -28,7 +28,6 @@ from scipy.stats.stats import pearsonr
 
 # For non-interactive plotting
 import matplotlib as mpl
-mpl.use('Agg')
 import matplotlib.pyplot as plt
 
 import uno as benchmark
@@ -38,8 +37,8 @@ import uno_data
 from uno_data import CombinedDataLoader, CombinedDataGenerator, DataFeeder, read_feature_set_and_labels
 
 
+mpl.use('Agg')
 logger = logging.getLogger(__name__)
-
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 
@@ -52,16 +51,7 @@ def set_seed(seed):
     if K.backend() == 'tensorflow':
         import tensorflow as tf
         tf.set_random_seed(seed)
-        # session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-        # sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-        # K.set_session(sess)
-
-        # Uncommit when running on an optimized tensorflow where NUM_INTER_THREADS and
-        # NUM_INTRA_THREADS env vars are set.
-        # session_conf = tf.ConfigProto(inter_op_parallelism_threads=int(os.environ['NUM_INTER_THREADS']),
-        #	intra_op_parallelism_threads=int(os.environ['NUM_INTRA_THREADS']))
-        # sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-        # K.set_session(sess)
+        candle.set_parallelism_threads()
 
 
 def verify_path(path):
@@ -113,11 +103,11 @@ def extension_from_parameters(args):
         ext += '.ng'
     for i, n in enumerate(args.dense):
         if n > 0:
-            ext += '.D{}={}'.format(i+1, n)
+            ext += '.D{}={}'.format(i + 1, n)
     if args.dense_feature_layers != args.dense:
         for i, n in enumerate(args.dense):
             if n > 0:
-                ext += '.FD{}={}'.format(i+1, n)
+                ext += '.FD{}={}'.format(i + 1, n)
 
     return ext
 
@@ -130,9 +120,9 @@ def discretize(y, bins=5):
 
 
 def r2(y_true, y_pred):
-    SS_res =  K.sum(K.square(y_true - y_pred))
+    SS_res = K.sum(K.square(y_true - y_pred))
     SS_tot = K.sum(K.square(y_true - K.mean(y_true)))
-    return (1 - SS_res/(SS_tot + K.epsilon()))
+    return (1 - SS_res / (SS_tot + K.epsilon()))
 
 
 def mae(y_true, y_pred):
@@ -248,7 +238,7 @@ def build_model(loader, args, permanent_dropout=True, silent=False):
     encoded_inputs = []
     for fea_name, fea_type in loader.input_features.items():
         shape = loader.feature_shapes[fea_type]
-        fea_input = Input(shape, name='input.'+fea_name)
+        fea_input = Input(shape, name='input.' + fea_name)
         inputs.append(fea_input)
         if fea_type in input_models:
             input_model = input_models[fea_type]
@@ -282,11 +272,11 @@ def initialize_parameters():
 
     # Build benchmark object
     unoBmk = benchmark.BenchmarkUno(benchmark.file_path, 'uno_default_model.txt', 'keras',
-    prog='uno_baseline', desc='Build neural network based models to predict tumor response to single and paired drugs.')
+                                    prog='uno_baseline', desc='Build neural network based models to predict tumor response to single and paired drugs.')
 
     # Initialize parameters
     gParameters = candle.initialize_parameters(unoBmk)
-    #benchmark.logger.info('Params: {}'.format(gParameters))
+    # benchmark.logger.info('Params: {}'.format(gParameters))
 
     return gParameters
 
@@ -301,7 +291,7 @@ def run(params):
     ext = extension_from_parameters(args)
     verify_path(args.save)
     prefix = args.save + ext
-    logfile = args.logfile if args.logfile else prefix+'.log'
+    logfile = args.logfile if args.logfile else prefix + '.log'
     set_up_logger(logfile, args.verbose)
     logger.info('Params: {}'.format(params))
 
@@ -309,9 +299,8 @@ def run(params):
         import tensorflow as tf
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = True
-        config.gpu_options.visible_device_list = ",".join(map(str,args.gpus))
+        config.gpu_options.visible_device_list = ",".join(map(str, args.gpus))
         K.set_session(tf.Session(config=config))
-
 
     loader = CombinedDataLoader(seed=args.rng_seed)
     loader.load(cache=args.cache,
@@ -476,13 +465,13 @@ def run(params):
     #
     if args.cp:
         model_json = model.to_json()
-        with open(prefix+'.model.json', 'w') as f:
+        with open(prefix + '.model.json', 'w') as f:
             print(model_json, file=f)
 
     def warmup_scheduler(epoch):
-        lr = args.learning_rate or base_lr * args.batch_size/100
+        lr = args.learning_rate or base_lr * args.batch_size / 100
         if epoch <= 5:
-            K.set_value(model.optimizer.lr, (base_lr * (5-epoch) + lr * epoch) / 5)
+            K.set_value(model.optimizer.lr, (base_lr * (5 - epoch) + lr * epoch) / 5)
         logger.debug('Epoch {}: lr={:.5g}'.format(epoch, K.get_value(model.optimizer.lr)))
         return K.get_value(model.optimizer.lr)
 
@@ -493,22 +482,15 @@ def run(params):
 
     for fold in range(cv):
         if args.cv > 1:
-            logger.info('Cross validation fold {}/{}:'.format(fold+1, cv))
-            cv_ext = '.cv{}'.format(fold+1)
+            logger.info('Cross validation fold {}/{}:'.format(fold + 1, cv))
+            cv_ext = '.cv{}'.format(fold + 1)
 
         if len(args.gpus) > 1:
             from keras.utils import multi_gpu_model
             gpu_count = len(args.gpus)
             model = multi_gpu_model(build_model(loader, args, silent=True), cpu_merge=False, gpus=gpu_count)
-            max_queue_size = 10 * gpu_count
-            use_multiprocessing = False
-            workers = 1 # * gpu_count
         else:
-            model = build_model(loader,args, silent=True)
-            max_queue_size = 10
-            use_multiprocessing = False
-            workers = 1
-
+            model = build_model(loader, args, silent=True)
 
         optimizer = optimizers.deserialize({'class_name': args.optimizer, 'config': {}})
         base_lr = args.base_lr or K.get_value(optimizer.lr)
@@ -525,7 +507,7 @@ def run(params):
 
         reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=5, min_lr=0.00001)
         warmup_lr = LearningRateScheduler(warmup_scheduler)
-        checkpointer = ModelCheckpoint(prefix+cv_ext+'.weights.h5', save_best_only=True, save_weights_only=True)
+        checkpointer = MultiGPUCheckpoint(prefix + cv_ext + '.model.h5', save_best_only=True)
         tensorboard = TensorBoard(log_dir="tb/tb{}{}".format(ext, cv_ext))
         history_logger = LoggingCallback(logger.debug)
         model_recorder = ModelRecorder()
@@ -570,15 +552,11 @@ def run(params):
                                 callbacks=callbacks,
                                 validation_data=(x_val_list, y_val))
         else:
-            logger.info('Data points per epoch: train = %d, val = %d',train_gen.size, val_gen.size)
-            logger.info('Steps per epoch: train = %d, val = %d',train_gen.steps, val_gen.steps)
+            logger.info('Data points per epoch: train = %d, val = %d', train_gen.size, val_gen.size)
+            logger.info('Steps per epoch: train = %d, val = %d', train_gen.steps, val_gen.steps)
             history = model.fit_generator(train_gen, train_gen.steps,
                                           epochs=args.epochs,
                                           callbacks=callbacks,
-                                          shuffle=True,
-                                          max_queue_size=max_queue_size,
-                                          use_multiprocessing=use_multiprocessing,
-                                          workers=workers,
                                           validation_data=val_gen,
                                           validation_steps=val_gen.steps)
 
@@ -603,7 +581,7 @@ def run(params):
             y_val_pred = model.predict(x_val_list, batch_size=args.batch_size)
         else:
             val_gen.reset()
-            y_val_pred = model.predict_generator(val_gen, val_gen.steps+1)
+            y_val_pred = model.predict_generator(val_gen, val_gen.steps + 1)
             y_val_pred = y_val_pred[:val_gen.size]
 
         y_val_pred = y_val_pred.flatten()
@@ -611,9 +589,9 @@ def run(params):
         scores = evaluate_prediction(y_val, y_val_pred)
         log_evaluation(scores)
 
-        df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred-y_val)
-        df_val['Predicted'+target] = y_val_pred
-        df_val[target+'Error'] = y_val_pred-y_val
+        df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred - y_val)
+        df_val['Predicted' + target] = y_val_pred
+        df_val[target + 'Error'] = y_val_pred - y_val
         df_pred_list.append(df_val)
 
         if hasattr(history, 'loss'):
@@ -630,7 +608,7 @@ def run(params):
     df_pred.to_csv(pred_fname, sep='\t', index=False, float_format='%.4g')
 
     if args.cv > 1:
-        scores = evaluate_prediction(df_pred[target], df_pred['Predicted'+target])
+        scores = evaluate_prediction(df_pred[target], df_pred['Predicted' + target])
         log_evaluation(scores, description='Combining cross validation folds:')
 
     for test_source in loader.test_sep_sources:
