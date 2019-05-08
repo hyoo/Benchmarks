@@ -7,6 +7,7 @@ import collections
 import logging
 import os
 import random
+import sys
 import threading
 import time
 
@@ -357,8 +358,8 @@ def run(params):
         # The 'cell_rnaseq' feature set is stored in chunks to address HDFStore column capacity
         # limitations.
         #
-        # The full cell descriptor is too wide for direct HDFS H5 representation, Break it up 
-        # into gulp_size chunks and write each independently. The column names are replaced with
+        # The full 'cell_rnaseq' is too wide for direct HDFS H5 representation, Break it up 
+        # into gulp_size chunks and write each independently. The HDFStore column names are replaced with
         # null-strings because (1) the header storage space is limitted and (2) they are not needed.
 
         store = pd.HDFStore(export_data_fname, complevel=9, complib='blosc:snappy')
@@ -372,6 +373,11 @@ def run(params):
         input_feature_list = [fname for fname in loader.input_features]
         if input_feature_list.count('cell.rnaseq') > 0:
             cell_rnaseq_ndx = input_feature_list.index('cell.rnaseq')
+
+        # single/multiple drug feature sets 
+        feature_itemsizes = {'Sample':30, 'Drug1':10}
+        if args.single == False:
+            feature_itemsizes['Drug2'] = 10
 
         for partition in ['train', 'val']:
             gen = train_gen if partition == 'train' else val_gen
@@ -402,7 +408,8 @@ def run(params):
 
                 # store labels
                 store.append('y_{}'.format(partition), y.astype({target:'float32'}), format='table',
-                        min_itemsize={'Sample':30, 'Drug1':10, 'Drug2':10})
+                    min_itemsize=feature_itemsizes
+                )
 
                 logger.info('Generating {} dataset. {} / {}'.format(partition, i, gen.steps))
 
@@ -426,32 +433,31 @@ def run(params):
         return
 
     # If training/evaluating with previously exported data, recover the names of the individual
-    # features (genes) associated with the cell_rnaseq feature set from the HDFStore file
+    # features associated with the cell_rnaseq feature set from the HDFStore file
     
     if args.use_exported_data:
-        filename = args.use_exported_data 
-        if not os.path.exists(filename):
-            sys.exit("Exported data file: %s not found" % filename)
+        export_file = args.use_exported_data 
+        if not os.path.exists(export_file):
+            sys.exit("Exported data file: %s not found" % export_file)
 
-        pd_store  = pd.HDFStore(filename)
-        names     = pd_store.get('feature_names')
+        export_store = pd.HDFStore(export_file)
+        names = export_store.get('feature_names')
         name_list = names.iloc[:,0].tolist()
         loader.cell_feature_names = {key:seq for (seq, key) in enumerate(name_list)}
-        pd_store.close()
+        export_store.close()
 
-    # The 'cell_features_list' argument can be specified with 'use_exported_data' to define
+    # The 'cell_feature_subset_path' argument can be specified with 'use_exported_data' to define
     # a subset of features (genes) from the complete 'cell_rnaseq' feature set. It is optional,
     # however, and all features are selected in the absence of that arg.
 
-    if args.cell_features_list:
-        if not args.use_exported_data:
-            sys.exit('Feature selection lists are only available with use_exported_data')
+    if args.cell_feature_subset_path and args.use_exported_data:
+        export_file = args.use_exported_data 
+        feature_file = args.cell_feature_subset_path
+        if not os.path.exists(feature_file):
+            sys.exit("Cell feature selection file: %s not found" % feature_file)
 
-        featfile = args.cell_features_list
-        if not os.path.exists(featfile):
-            sys.exit("Cell feature selection file: %s not found" % featfile)
-
-        loader.select_cell_features(featfile)
+        loader.select_cell_features(feature_file)
+        loader.create_cell_features_extract_file(feature_file, export_file)  
 
     #
     # Build the model 
@@ -466,7 +472,7 @@ def run(params):
     # plot_model(model, to_file=prefix+'.model.png', show_shapes=True)
 
     #
-    #
+    # Save model in JSON format
     #
     if args.cp:
         model_json = model.to_json()
@@ -569,6 +575,7 @@ def run(params):
             history = model.fit_generator(train_gen, train_gen.steps,
                                           epochs=args.epochs,
                                           callbacks=callbacks,
+                                          shuffle=True,
                                           max_queue_size=max_queue_size,
                                           use_multiprocessing=use_multiprocessing,
                                           workers=workers,

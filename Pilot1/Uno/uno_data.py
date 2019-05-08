@@ -33,6 +33,11 @@ SEED = 2018
 P1B3_URL = 'http://ftp.mcs.anl.gov/pub/candle/public/benchmarks/P1B3/'
 DATA_URL = 'http://ftp.mcs.anl.gov/pub/candle/public/benchmarks/Pilot1/combo/'
 
+# implementing cell.rnaseq feature group selection (subset) file
+CELLFEAT_FILE_SFX = '_rnaseq_subset'
+CELLFEAT_LIST_KEY = 'feature_selections'
+CELLFEAT_GRP_NAME = 'cell.rnaseq'
+      
 logger = logging.getLogger(__name__)
 
 
@@ -186,7 +191,7 @@ def load_combo_dose_response(fraction=True):
     df['SOURCE'] = 'ALMANAC.' + df['SCREENER']
 
     cellmap_path = get_file(DATA_URL + 'NCI60_CELLNAME_to_Combo.txt')
-    df_cellmap = pd.read_table(cellmap_path)
+    df_cellmap = pd.read_csv(cellmap_path, sep='\t')
     df_cellmap.set_index('Name', inplace=True)
     cellmap = df_cellmap[['NCI60.ID']].to_dict()['NCI60.ID']
 
@@ -213,7 +218,7 @@ def load_aggregated_single_response(target='AUC', min_r2_fit=0.3, max_ec50_se=3,
 
     df = global_cache.get(path)
     if df is None:
-        df = pd.read_table(path, engine='c',
+        df = pd.read_csv(path, sep='\t', engine='c',
                            dtype={'SOURCE': str, 'CELL': str, 'DRUG': str, 'STUDY': str,
                                   'AUC': np.float32, 'IC50': np.float32,
                                   'EC50': np.float32, 'EC50se': np.float32,
@@ -331,7 +336,7 @@ def load_drug_fingerprints(ncols=None, scaling='std', imputing='mean', dropna=No
 
 def load_drug_info():
     path = get_file(DATA_URL + 'drug_info')
-    df = pd.read_table(path, dtype=object)
+    df = pd.read_csv(path, sep='\t', dtype=object)
     df['PUBCHEM'] = 'PubChem.CID.' + df['PUBCHEM']
     return df
 
@@ -348,16 +353,16 @@ def lookup(df, query, ret, keys, match='match'):
 
 def load_cell_metadata():
     path = get_file(DATA_URL + 'cl_metadata')
-    df = pd.read_table(path)
+    df = pd.read_csv(path, sep='\t')
     return df
 
 
 def cell_name_to_ids(name, source=None):
     path = get_file(DATA_URL + 'NCI60_CELLNAME_to_Combo.txt')
-    df1 = pd.read_table(path)
+    df1 = pd.read_csv(path, sep='\t')
     hits1 = lookup(df1, name, 'NCI60.ID', ['NCI60.ID', 'CELLNAME', 'Name'], match='contains')
     path = get_file(DATA_URL + 'cl_mapping')
-    df2 = pd.read_table(path, header=None)
+    df2 = pd.read_csv(path, sep='\t', header=None)
     hits2 = lookup(df2, name, [0, 1], [0, 1], match='contains')
     hits = hits1 + hits2
     if source:
@@ -368,7 +373,7 @@ def cell_name_to_ids(name, source=None):
 def drug_name_to_ids(name, source=None):
     df1 = load_drug_info()
     path = get_file(DATA_URL + 'NCI_IOA_AOA_drugs')
-    df2 = pd.read_table(path, dtype=str)
+    df2 = pd.read_csv(path, sep='\t', dtype=str)
     df2['NSC'] = 'NSC.' + df2['NSC']
     hits1 = lookup(df1, name, 'ID', ['ID', 'NAME', 'CLEAN_NAME', 'PUBCHEM'])
     hits2 = lookup(df2, name, 'NSC', ['NSC', 'Generic Name', 'Preffered Name'])
@@ -382,7 +387,7 @@ def load_drug_set_descriptors(drug_set='Combined_PubChem', ncols=None, usecols=N
                               scaling=None, imputing=None, add_prefix=False):
     path = get_file(DATA_URL + '{}_dragon7_descriptors.tsv'.format(drug_set))
 
-    df_cols = pd.read_table(path, engine='c', nrows=0)
+    df_cols = pd.read_csv(path, sep='\t', engine='c', nrows=0)
     total = df_cols.shape[1] - 1
     if usecols is not None:
         usecols = [x for x in usecols if x in df_cols.columns]
@@ -395,7 +400,7 @@ def load_drug_set_descriptors(drug_set='Combined_PubChem', ncols=None, usecols=N
         df_cols = df_cols.iloc[:, usecols]
 
     dtype_dict = dict((x, np.float32) for x in df_cols.columns[1:])
-    df = pd.read_table(path, engine='c', usecols=usecols, dtype=dtype_dict,
+    df = pd.read_csv(path, sep='\t', engine='c', usecols=usecols, dtype=dtype_dict,
                        na_values=['na', '-', ''])
 
     df1 = pd.DataFrame(df.loc[:, 'NAME'])
@@ -418,7 +423,7 @@ def load_drug_set_fingerprints(drug_set='Combined_PubChem', ncols=None, usecols=
     df_merged = None
     for fp in fps:
         path = get_file(DATA_URL + '{}_dragon7_{}.tsv'.format(drug_set, fp))
-        df_cols = pd.read_table(path, engine='c', nrows=0, skiprows=1, header=None)
+        df_cols = pd.read_csv(path, sep='\t', engine='c', nrows=0, skiprows=1, header=None)
         total = df_cols.shape[1] - 1
         if usecols_all is not None:
             usecols = [x.replace(fp+'.', '') for x in usecols_all]
@@ -433,7 +438,7 @@ def load_drug_set_fingerprints(drug_set='Combined_PubChem', ncols=None, usecols=
             df_cols = df_cols.iloc[:, usecols]
 
         dtype_dict = dict((x, np.float32) for x in df_cols.columns[1:])
-        df = pd.read_table(path, engine='c', skiprows=1, header=None,
+        df = pd.read_csv(path, sep='\t', engine='c', skiprows=1, header=None,
                            usecols=usecols, dtype=dtype_dict)
         df.columns = ['{}.{}'.format(fp, x) for x in df.columns]
 
@@ -492,7 +497,7 @@ def load_cell_rnaseq(ncols=None, scaling='std', imputing='mean', add_prefix=True
         filename += ('_' + preprocess_rnaseq)  # 'source_scale' or 'combat'
 
     path = get_file(DATA_URL + filename)
-    df_cols = pd.read_table(path, engine='c', nrows=0)
+    df_cols = pd.read_csv(path, sep='\t', engine='c', nrows=0)
     total = df_cols.shape[1] - 1  # remove Sample column
     if 'Cancer_type_id' in df_cols.columns:
         total -= 1
@@ -507,7 +512,7 @@ def load_cell_rnaseq(ncols=None, scaling='std', imputing='mean', add_prefix=True
         df_cols = df_cols.iloc[:, usecols]
 
     dtype_dict = dict((x, np.float32) for x in df_cols.columns[1:])
-    df = pd.read_table(path, engine='c', usecols=usecols, dtype=dtype_dict)
+    df = pd.read_csv(path, sep='\t', engine='c', usecols=usecols, dtype=dtype_dict)
     if 'Cancer_type_id' in df.columns:
         df.drop('Cancer_type_id', axis=1, inplace=True)
 
@@ -617,12 +622,14 @@ def values_or_dataframe(df, contiguous=False, dataframe=False):
     return mat
 
 
+
 def read_feature_set_and_labels(
     nbr_features = None, 
-    cell_feature_ndx = None,        # optional 
+    cell_feature_ndx = None,        
     loader    = None,
     partition = None,
-    HDFStore  = None,
+    HDFStore_base  = None,
+    HDFStore_cellfeat  = None,
     start = None, 
     stop  = None
 ):
@@ -633,14 +640,19 @@ def read_feature_set_and_labels(
         store_key = 'x_{0}_{1}'.format(partition, i)
 
         if i != cell_feature_ndx:
-            x.append(HDFStore.select(store_key, start=start, stop=stop))
+            x.append(HDFStore_base.select(store_key, start=start, stop=stop))
+     
+        elif HDFStore_cellfeat != None:
+            cellfeat_key = 'x_{}_{}'.format(partition, CELLFEAT_FILE_SFX)
+            x.append(HDFStore_cellfeat.select(cellfeat_key, start=start, stop=stop))
+        
         else:
             segnbr = 0
             df_accum = pd.DataFrame()
             while True:
                 store_subkey = '{}_{}'.format(store_key, segnbr)
                 try:
-                    t = HDFStore.select(store_subkey, start=start, stop=stop)
+                    t = HDFStore_base.select(store_subkey, start=start, stop=stop)
                 except KeyError:
                     break        
                 df_accum = pd.concat([df_accum, t], axis=1)   
@@ -656,14 +668,13 @@ def read_feature_set_and_labels(
                 x.append(df_extract)
 
     # acquire labels
-    y = HDFStore.select('y_{}'.format(partition), start=start, stop=stop, columns=['Growth'])
+    y = HDFStore_base.select('y_{}'.format(partition), start=start, stop=stop, columns=['Growth'])
     
     return x,y
 
-
-def identify_duplicates(as_list, as_set, name='list'):
+def identify_duplicates(list, name='list'):
     """ identify duplicates in as_list iterable using as_set set """
-    copy_set  = as_set.copy()
+    copy_set  = set(list)
     sort_list = as_list[:]
     sort_list.sort()
 
@@ -676,9 +687,10 @@ def identify_duplicates(as_list, as_set, name='list'):
 class CombinedDataLoader(object):
     def __init__(self, seed=SEED):
         self.seed = seed
-        self.cell_feature_names = None          # a list of all cell.rnaseq feature names
-        self.feature_selections = None          # a list of all cell.rnaseq feature names selected
-        self.feature_selection_xref = None      # x list xrefing selected names to all nams
+        self.cell_feature_names = None          # list of all cell.rnaseq feature names
+        self.feature_selections = None          # list of selected cell.rnaseq feature names
+        self.feature_selection_xref = None      # list of ints xrefing selected names to all names
+        self.feature_selection_file = None      # name of file containing cell.rnaseq feature names
 
     def load_from_cache(self, cache, params):
         param_fname = '{}.params.json'.format(cache)
@@ -691,7 +703,7 @@ class CombinedDataLoader(object):
             except json.JSONDecodeError as e:
                 logger.warning('Could not decode parameter file %s: %s', param_fname, e)
                 return False
-        ignore_keys = ['cache', 'partition_by', 'single']
+        ignore_keys = ['cache', 'partition_by', 'single', 'cell_feature_subset_path']
         equal, diffs = dict_compare(params, cached_params, ignore_keys)
         if not equal:
             logger.warning('Cache parameter mismatch: %s\nSaved: %s\nAttemptd to load: %s', diffs, cached_params, params)
@@ -852,9 +864,17 @@ class CombinedDataLoader(object):
             logger.info('  {}: {}'.format(k, self.feature_shapes[v]))
         logger.info('Total input dimensions: {}'.format(self.input_dim))
 
+    #
+    # Process the feature names provided in the file named by the cell_feature_subset_path= argument.
+    # Construct a lookup mechanism for those named features.
+    #
+    # This function is used only in conjuction with HDFS exported_data  
+    #
+    def select_cell_features(self, cell_features_filename):
+        if cell_features_filename == None:
+            return
 
-    def select_cell_features(self, feature_filename):
-        with open(feature_filename) as f:
+        with open(cell_features_filename) as f:
             text_list = f.readlines()
         
         self.feature_selections = [line.strip() for line in text_list]
@@ -862,21 +882,21 @@ class CombinedDataLoader(object):
 
         select_len = len(self.feature_selections)
         if select_len == 0:
-            sys.exit("The feature selection list: %s is empty" % feature_filename)
+            sys.exit("The cell feature selection list is empty")
 
         # Duplicate feature names are allowed but most likely indicate a feature selection file error
         # Report all duplicate names (could be difficult to spot without programmed assistance)
 
         feature_set = set(self.feature_selections)
         if len(feature_set) != select_len:
-            logger.warn('The cell_features_list contains duplicate entries')
-            identify_duplicates(as_list=self.feature_selections, as_set=feature_set, name=feature_filename)
+            logger.warn('The cell feature selection list contains duplicate entries')
+            identify_duplicates(self.feature_selections, name='cell feature selection list')
     
         # replace raw 'cell.rnaseq' width with that of the 'selected features' list
         self.feature_shapes['cell.rnaseq'] = (select_len,)
 
         # Construct feature_selection_xref list. Each entry contains an index into the full 
-        # cell_rnaseq feature array. It is an error if a selected feature name cannot be matched
+        # cell_rnaseq feature array. It is an error if a selected feature name cannot be matched.
         
         berror = False
         self.feature_selection_xref = []
@@ -891,6 +911,95 @@ class CombinedDataLoader(object):
 
         if berror:
             sys.exit('Terminating due to error')
+
+    #
+    # Create a copy of the cell_rnaseq feature group selecting only those genes that 
+    # were specified in the cell_feature_subset_path=<filename> argument. A new HDFS
+    # file is created and subsequently read during training and validation. The intent
+    # is to improve performance by eliminating the transfer of unused features in the
+    # base HDFS dataset.
+    #
+    # This function is used only in conjuction with HDFS exported_data  
+    #
+
+    def create_cell_features_extract_file(self, feature_file=None, export_file=None):
+        df_feature_selections = pd.DataFrame(self.feature_selections) 
+        cellfeat_file = feature_file + '_rnaseq_subset'
+        cellfeat_store = pd.HDFStore(cellfeat_file)
+
+        start_time = time.strftime("%X", time.localtime())
+
+        try:
+            df_stored_feature_selections = cellfeat_store.select(CELLFEAT_LIST_KEY)
+        except KeyError:
+            df_stored_feature_selections = pd.DataFrame()
+            print("%s CREATING cell feature extraction file: %s" % (start_time, cellfeat_file)) 
+        except:
+            sys.exit("Unexpected HDFS error")
+
+        if df_stored_feature_selections.equals(df_feature_selections): 
+            print("%s USING cell feature extraction file: %s" % (start_time, cellfeat_file))
+            self.feature_selection_file = cellfeat_file
+            cellfeat_store.close()
+            return 
+   
+        # replace the current cell feature extraction file with a new one
+        if df_stored_feature_selections.size != 0:
+            print("%s REPLACING cell feature extraction file: %s" % (start_time, cellfeat_file))
+        cellfeat_store.close()
+        os.remove(cellfeat_file)    
+        cellfeat_store = pd.HDFStore(cellfeat_file)
+
+        # convert feature-group name to feature index used in H5 key
+        input_feature_list = [fname for fname in self.input_features]
+        cellfeat_grp_ndx = input_feature_list.index(CELLFEAT_GRP_NAME)
+       
+        export_store = pd.HDFStore(export_file)
+
+        for partition in ['train', 'val']:
+            in_key_major = 'x_{}_{}'.format(partition, cellfeat_grp_ndx)
+            out_key = 'x_{}_{}'.format(partition, CELLFEAT_FILE_SFX)
+            recno = 0           # walk sequentually through the file in CHUNKSZ gulps
+            CHUNKSZ = 8192      # tested with much larger (30K)
+            eof = False         # raised once all source data is processed
+
+            while eof == False:
+                i = 0
+                df_accum = pd.DataFrame()                   # collects all stored feature-group cols
+                
+                while True:
+                    in_key_full = '{}_{}'.format(in_key_major, i)
+                    try:
+                        t = export_store.select(in_key_full, start=recno, stop=recno + CHUNKSZ)
+                    except KeyError:
+                        break
+                    if t.size == 0:
+                        eof = True
+                        break
+                    
+                    df_accum = pd.concat([df_accum, t], axis=1)
+                    i += 1   
+
+                # extract selected features from df_accum and append to df_extract
+                if eof == False and df_accum.size != 0:     # catches no 'val' data, for example
+                    df_extract = pd.DataFrame()             # collects selected feature-group cols
+
+                    for k, ndx in enumerate(self.feature_selection_xref):
+                        df_extract[k] = df_accum.iloc[:, ndx]
+
+                    df_extract.columns = [''] * len(df_extract.columns)
+                    cellfeat_store.append(out_key, df_extract, format='table')
+                    recno += CHUNKSZ
+
+        # feature-selections go last, prevent use of this file if incomplete / corrupted
+        cellfeat_store.put(CELLFEAT_LIST_KEY, df_feature_selections)    
+        self.feature_selection_file = cellfeat_file
+        stop_time = time.strftime("%X", time.localtime())
+        print("%s Cell feature extraction file ready for use" % (stop_time))
+
+        cellfeat_store.close()
+        export_store.close()
+
 
     def load(self, cache=None, ncols=None, scaling='std', dropna=None,
              agg_dose=None, embed_feature_source=True, encode_response_source=True,
@@ -1061,11 +1170,23 @@ class DataFeeder(keras.utils.Sequence):
 
         input_feature_list = [fname for fname in loader.input_features]
         self.feature_set_count = len(input_feature_list)
-        self.cell_rnaseq_ndx = None
+       
+        # needed reassemble segmented features from this very wide feature-group
         if input_feature_list.count('cell.rnaseq') > 0:
             self.cell_rnaseq_ndx = input_feature_list.index('cell.rnaseq')
+        else:
+            self.cell_rnaseq_ndx = None
+        
+        # cell feature-group extractions may be available in a parallel h5 dataset
+        if loader.feature_selection_file:
+            self.cellfeat_store = pd.HDFStore(loader.feature_selection_file)
+        else:
+            self.cellfeat_store = None
 
-        self.gets = 0 # ???????????????????????????????????????????
+    def __del__(self):
+        self.store.close()
+        if self.cellfeat_store:
+            self.cellfeat_store.close()
 
     def __getitem__(self, idx):
         _idx = self.index_map[idx]
@@ -1078,11 +1199,11 @@ class DataFeeder(keras.utils.Sequence):
             cell_feature_ndx = self.cell_rnaseq_ndx,
             loader = self.data,
             partition = self.partition,
-            HDFStore  = self.store,
+            HDFStore_base = self.store,
+            HDFStore_cellfeat = self.cellfeat_store,
             start = start,
             stop  = stop
         )    
-        self.gets += 1  # ?????????????????????????????????????????
         return x, y
 
     def __len__(self):
