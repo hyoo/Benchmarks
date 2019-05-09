@@ -216,13 +216,13 @@ def load_aggregated_single_response(target='AUC', min_r2_fit=0.3, max_ec50_se=3,
 
     df = global_cache.get(path)
     if df is None:
-        df = pd.read_csv(path, sep='\t', engine='c',
-                           dtype={'SOURCE': str, 'CELL': str, 'DRUG': str, 'STUDY': str,
-                                  'AUC': np.float32, 'IC50': np.float32,
-                                  'EC50': np.float32, 'EC50se': np.float32,
-                                  'R2fit': np.float32, 'Einf': np.float32,
-                                  'HS': np.float32, 'AAC1': np.float32,
-                                  'AUC1': np.float32, 'DSS1': np.float32})
+        df = pd.read_csv(path, engine='c', sep='\t',
+                         dtype={'SOURCE': str, 'CELL': str, 'DRUG': str, 'STUDY': str,
+                                'AUC': np.float32, 'IC50': np.float32,
+                                'EC50': np.float32, 'EC50se': np.float32,
+                                'R2fit': np.float32, 'Einf': np.float32,
+                                'HS': np.float32, 'AAC1': np.float32,
+                                'AUC1': np.float32, 'DSS1': np.float32})
         global_cache[path] = df
 
     total = len(df)
@@ -385,7 +385,7 @@ def load_drug_set_descriptors(drug_set='Combined_PubChem', ncols=None, usecols=N
                               scaling=None, imputing=None, add_prefix=False):
     path = get_file(DATA_URL + '{}_dragon7_descriptors.tsv'.format(drug_set))
 
-    df_cols = pd.read_csv(path, sep='\t', engine='c', nrows=0)
+    df_cols = pd.read_csv(path, engine='c', sep='\t', nrows=0)
     total = df_cols.shape[1] - 1
     if usecols is not None:
         usecols = [x for x in usecols if x in df_cols.columns]
@@ -398,8 +398,8 @@ def load_drug_set_descriptors(drug_set='Combined_PubChem', ncols=None, usecols=N
         df_cols = df_cols.iloc[:, usecols]
 
     dtype_dict = dict((x, np.float32) for x in df_cols.columns[1:])
-    df = pd.read_csv(path, sep='\t', engine='c', usecols=usecols, dtype=dtype_dict,
-                       na_values=['na', '-', ''])
+    df = pd.read_csv(path, engine='c', sep='\t', usecols=usecols, dtype=dtype_dict,
+                     na_values=['na', '-', ''])
 
     df1 = pd.DataFrame(df.loc[:, 'NAME'])
     df1.rename(columns={'NAME': 'Drug'}, inplace=True)
@@ -421,7 +421,7 @@ def load_drug_set_fingerprints(drug_set='Combined_PubChem', ncols=None, usecols=
     df_merged = None
     for fp in fps:
         path = get_file(DATA_URL + '{}_dragon7_{}.tsv'.format(drug_set, fp))
-        df_cols = pd.read_csv(path, sep='\t', engine='c', nrows=0, skiprows=1, header=None)
+        df_cols = pd.read_csv(path, engine='c', sep='\t', nrows=0, skiprows=1, header=None)
         total = df_cols.shape[1] - 1
         if usecols_all is not None:
             usecols = [x.replace(fp + '.', '') for x in usecols_all]
@@ -436,8 +436,8 @@ def load_drug_set_fingerprints(drug_set='Combined_PubChem', ncols=None, usecols=
             df_cols = df_cols.iloc[:, usecols]
 
         dtype_dict = dict((x, np.float32) for x in df_cols.columns[1:])
-        df = pd.read_csv(path, sep='\t', engine='c', skiprows=1, header=None,
-                           usecols=usecols, dtype=dtype_dict)
+        df = pd.read_csv(path, engine='c', sep='\t', skiprows=1, header=None,
+                         usecols=usecols, dtype=dtype_dict)
         df.columns = ['{}.{}'.format(fp, x) for x in df.columns]
 
         col1 = '{}.0'.format(fp)
@@ -495,7 +495,7 @@ def load_cell_rnaseq(ncols=None, scaling='std', imputing='mean', add_prefix=True
         filename += ('_' + preprocess_rnaseq)  # 'source_scale' or 'combat'
 
     path = get_file(DATA_URL + filename)
-    df_cols = pd.read_csv(path, sep='\t', engine='c', nrows=0)
+    df_cols = pd.read_csv(path, engine='c', sep='\t', nrows=0)
     total = df_cols.shape[1] - 1  # remove Sample column
     if 'Cancer_type_id' in df_cols.columns:
         total -= 1
@@ -510,7 +510,7 @@ def load_cell_rnaseq(ncols=None, scaling='std', imputing='mean', add_prefix=True
         df_cols = df_cols.iloc[:, usecols]
 
     dtype_dict = dict((x, np.float32) for x in df_cols.columns[1:])
-    df = pd.read_csv(path, sep='\t', engine='c', usecols=usecols, dtype=dtype_dict)
+    df = pd.read_csv(path, engine='c', sep='\t', usecols=usecols, dtype=dtype_dict)
     if 'Cancer_type_id' in df.columns:
         df.drop('Cancer_type_id', axis=1, inplace=True)
 
@@ -1212,6 +1212,8 @@ class DataFeeder(keras.utils.Sequence):
             np.random.shuffle(self.index_map)
 
     def reset(self):
+        """ empty method implementation to match reset() in CombinedDataGenerator
+        """
         pass
 
     def get_response(self, copy=False):
@@ -1221,6 +1223,9 @@ class DataFeeder(keras.utils.Sequence):
         df['Dose1'] = df_dose1
         df['Dose2'] = df_dose2
         return df.copy() if copy else df
+
+    def close(self):
+        self.store.close()
 
 
 class CombinedDataGenerator(keras.utils.Sequence):

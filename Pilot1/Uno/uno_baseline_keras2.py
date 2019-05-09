@@ -459,9 +459,6 @@ def run(params):
     model.summary(print_fn=logger.info)
     # plot_model(model, to_file=prefix+'.model.png', show_shapes=True)
 
-    #
-    # Save model in JSON format
-    #
     if args.cp:
         model_json = model.to_json()
         with open(prefix + '.model.json', 'w') as f:
@@ -509,12 +506,8 @@ def run(params):
         checkpointer = MultiGPUCheckpoint(prefix + cv_ext + '.model.h5', save_best_only=True)
         tensorboard = TensorBoard(log_dir="tb/{}{}{}".format(args.tb_prefix, ext, cv_ext))
         history_logger = LoggingCallback(logger.debug)
-        model_recorder = ModelRecorder()
 
-        # callbacks = [history_logger, model_recorder]
-        # callbacks = [candle_monitor, timeout_monitor, history_logger, model_recorder]
-        callbacks = []
-        # callbacks = [candle_monitor, history_logger, model_recorder]  #
+        callbacks = [candle_monitor, timeout_monitor, history_logger]
         if args.reduce_lr:
             callbacks.append(reduce_lr)
         if args.warmup_lr:
@@ -571,11 +564,6 @@ def run(params):
         print('Elapsed time: %.3f, CPU seconds: %.3f' % (wall_secs, cpu_secs))
         print('Samples per second (elapsed): %.3f, CPU: %.3f' % (samples_per_wall_sec, samples_per_cpu_sec))
 
-        if args.cp:
-            model = model_recorder.best_model
-            model.save(prefix+'.model.h5')
-            # model.load_weights(prefix+cv_ext+'.weights.h5')
-
         if args.no_gen:
             y_val_pred = model.predict(x_val_list, batch_size=args.batch_size)
         else:
@@ -588,7 +576,7 @@ def run(params):
         scores = evaluate_prediction(y_val, y_val_pred)
         log_evaluation(scores)
 
-        df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred - y_val)
+        # df_val = df_val.assign(PredictedGrowth=y_val_pred, GrowthError=y_val_pred - y_val)
         df_val['Predicted' + target] = y_val_pred
         df_val[target + 'Error'] = y_val_pred - y_val
         df_pred_list.append(df_val)
@@ -601,9 +589,15 @@ def run(params):
     pred_fname = prefix + '.predicted.tsv'
     df_pred = pd.concat(df_pred_list)
     if args.agg_dose:
-        df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', target], inplace=True)
+        if args.single:
+            df_pred.sort_values(['Sample', 'Drug1', target], inplace=True)
+        else:
+            df_pred.sort_values(['Source', 'Sample', 'Drug1', 'Drug2', target], inplace=True)
     else:
-        df_pred.sort_values(['Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
+        if args.single:
+            df_pred.sort_values(['Sample', 'Drug1', 'Dose1', 'Growth'], inplace=True)
+        else:
+            df_pred.sort_values(['Sample', 'Drug1', 'Drug2', 'Dose1', 'Dose2', 'Growth'], inplace=True)
     df_pred.to_csv(pred_fname, sep='\t', index=False, float_format='%.4g')
 
     if args.cv > 1:
