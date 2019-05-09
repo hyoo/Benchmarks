@@ -173,23 +173,13 @@ class PermanentDropout(Dropout):
         return x
 
 
-class ModelRecorder(Callback):
-    def __init__(self, save_all_models=False):
-        Callback.__init__(self)
-        self.save_all_models = save_all_models
-        get_custom_objects()['PermanentDropout'] = PermanentDropout
+class MultiGPUCheckpoint(ModelCheckpoint):
 
-    def on_train_begin(self, logs={}):
-        self.val_losses = []
-        self.best_val_loss = np.Inf
-        self.best_model = None
-
-    def on_epoch_end(self, epoch, logs={}):
-        val_loss = logs.get('val_loss')
-        self.val_losses.append(val_loss)
-        if val_loss < self.best_val_loss:
-            self.best_model = keras.models.clone_model(self.model)
-            self.best_val_loss = val_loss
+    def set_model(self, model):
+        if isinstance(model.layers[-2], Model):
+            self.model = model.layers[-2]
+        else:
+            self.model = model
 
 
 def build_feature_model(input_shape, name='', dense_layers=[1000, 1000],
