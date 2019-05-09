@@ -206,7 +206,7 @@ required = [
     'optimizer',
     'residual',
     'rng_seed',
-    'save',
+    'save_path',
     'scaling',
     'validation_split',
     'solr_root',
