@@ -1,12 +1,9 @@
 [Global_Params]
-train_sources=['CTRP']
-cache='cache/CTRP'
+train_sources=['GDSC', 'CTRP', 'ALMANAC']
 test_sources=['train']
 cell_types=None
 cell_features=['rnaseq']
 drug_features=['descriptors', 'fingerprints']
-no_response_source=True
-no_feature_source=True
 dense=[1000, 1000, 1000]
 dense_feature_layers=[1000, 1000, 1000]
 activation='relu'
@@ -14,8 +11,8 @@ loss='mse'
 optimizer='adam'
 scaling='std'
 drop=0
-epochs=1
-batch_size=4096
+epochs=10
+batch_size=32
 validation_split=0.2
 cv=1
 max_val_loss=1.0
@@ -27,12 +24,10 @@ warmup_lr=False
 batch_normalization=False
 feature_subsample=0
 rng_seed=2018
-save='save/uno'
+save_path='save/uno'
 no_gen=False
 verbose = False
-use_landmark_genes=True
-preprocess_rnaseq='combat'
 
 [Monitor_Params]
 solr_root=''
-timeout=-1
+timeout=3600
