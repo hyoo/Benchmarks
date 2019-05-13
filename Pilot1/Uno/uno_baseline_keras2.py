@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 
 import keras
+from clr_callback import *
 from keras import backend as K
 from keras import optimizers
 from keras.models import Model
@@ -411,6 +412,7 @@ def run(params):
         checkpointer = MultiGPUCheckpoint(prefix + cv_ext + '.model.h5', save_best_only=True)
         tensorboard = TensorBoard(log_dir="tb/{}{}{}".format(args.tb_prefix, ext, cv_ext))
         history_logger = LoggingCallback(logger.debug)
+        cycle_lr = CyclicLR(base_lr=0.00001, max_lr=0.006, step_size=2000., mode='exp_range', gamma=0.99994)
 
         callbacks = [candle_monitor, timeout_monitor, history_logger]
         if args.reduce_lr:
@@ -421,6 +423,8 @@ def run(params):
             callbacks.append(checkpointer)
         if args.tb:
             callbacks.append(tensorboard)
+        if args.cycle_lr:
+            callbacks.append(cycle_lr)
 
         if args.use_exported_data is not None:
             train_gen = DataFeeder(filename=args.use_exported_data, batch_size=args.batch_size, shuffle=args.shuffle, single=args.single, agg_dose=args.agg_dose)
