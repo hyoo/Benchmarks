@@ -35,7 +35,7 @@ DATA_URL = 'http://ftp.mcs.anl.gov/pub/candle/public/benchmarks/Pilot1/combo/'
 CELLFEAT_FILE_SFX = '_rnaseq_subset'
 CELLFEAT_LIST_KEY = 'feature_selections'
 CELLFEAT_GRP_NAME = 'cell.rnaseq'
-      
+
 logger = logging.getLogger(__name__)
 
 
@@ -620,16 +620,15 @@ def values_or_dataframe(df, contiguous=False, dataframe=False):
     return mat
 
 
-
 def read_feature_set_and_labels(
-    nbr_features = None, 
-    cell_feature_ndx = None,        
-    loader    = None,
+    nbr_features = None,
+    cell_feature_ndx = None,
+    loader = None,
     partition = None,
-    HDFStore_base  = None,
-    HDFStore_cellfeat  = None,
-    start = None, 
-    stop  = None
+    HDFStore_base = None,
+    HDFStore_cellfeat = None,
+    start = None,
+    stop = None
 ):
     x = []
 
@@ -639,11 +638,11 @@ def read_feature_set_and_labels(
 
         if i != cell_feature_ndx:
             x.append(HDFStore_base.select(store_key, start=start, stop=stop))
-     
-        elif HDFStore_cellfeat != None:
+
+        elif HDFStore_cellfeat is not None:
             cellfeat_key = 'x_{}_{}'.format(partition, CELLFEAT_FILE_SFX)
             x.append(HDFStore_cellfeat.select(cellfeat_key, start=start, stop=stop))
-        
+
         else:
             segnbr = 0
             df_accum = pd.DataFrame()
@@ -652,8 +651,8 @@ def read_feature_set_and_labels(
                 try:
                     t = HDFStore_base.select(store_subkey, start=start, stop=stop)
                 except KeyError:
-                    break        
-                df_accum = pd.concat([df_accum, t], axis=1)   
+                    break
+                df_accum = pd.concat([df_accum, t], axis=1)
                 segnbr += 1
 
             # extract selected columns from full feature set
@@ -667,20 +666,22 @@ def read_feature_set_and_labels(
 
     # acquire labels
     y = HDFStore_base.select('y_{}'.format(partition), start=start, stop=stop, columns=['Growth'])
-    
-    return x,y
 
-def identify_duplicates(list, name='list'):
-    """ identify duplicates in as_list iterable using as_set set """
-    copy_set  = set(list)
-    sort_list = as_list[:]
+    return x, y
+
+
+def identify_duplicates(name_list, name='list'):
+    """ identify duplicates in name_list iterable """
+    copy_set = set(name_list)
+    sort_list = name_list[:]
     sort_list.sort()
 
     for mem in sort_list:
         if mem in copy_set:
             copy_set -= {mem}
         else:
-            print('   member: %s appears multiple times in %s' % (mem, name)) 
+            print('   member: %s appears multiple times in %s' % (mem, name))
+
 
 class CombinedDataLoader(object):
     def __init__(self, seed=SEED):
@@ -866,15 +867,15 @@ class CombinedDataLoader(object):
     # Process the feature names provided in the file named by the cell_feature_subset_path= argument.
     # Construct a lookup mechanism for those named features.
     #
-    # This function is used only in conjuction with HDFS exported_data  
+    # This function is used only in conjuction with HDFS exported_data
     #
     def select_cell_features(self, cell_features_filename):
-        if cell_features_filename == None:
+        if cell_features_filename is None:
             return
 
         with open(cell_features_filename) as f:
             text_list = f.readlines()
-        
+
         self.feature_selections = [line.strip() for line in text_list]
         self.feature_selections = [line for line in self.feature_selections if line != '']
 
@@ -889,19 +890,19 @@ class CombinedDataLoader(object):
         if len(feature_set) != select_len:
             logger.warn('The cell feature selection list contains duplicate entries')
             identify_duplicates(self.feature_selections, name='cell feature selection list')
-    
+
         # replace raw 'cell.rnaseq' width with that of the 'selected features' list
         self.feature_shapes['cell.rnaseq'] = (select_len,)
 
-        # Construct feature_selection_xref list. Each entry contains an index into the full 
+        # Construct feature_selection_xref list. Each entry contains an index into the full
         # cell_rnaseq feature array. It is an error if a selected feature name cannot be matched.
-        
+
         berror = False
         self.feature_selection_xref = []
 
         for selection in self.feature_selections:
             featndx = self.cell_feature_names.get(selection)
-            if featndx:  
+            if featndx:
                 self.feature_selection_xref.append(featndx)
             else:
                 berror = True
@@ -911,17 +912,17 @@ class CombinedDataLoader(object):
             sys.exit('Terminating due to error')
 
     #
-    # Create a copy of the cell_rnaseq feature group selecting only those genes that 
+    # Create a copy of the cell_rnaseq feature group selecting only those genes that
     # were specified in the cell_feature_subset_path=<filename> argument. A new HDFS
     # file is created and subsequently read during training and validation. The intent
     # is to improve performance by eliminating the transfer of unused features in the
     # base HDFS dataset.
     #
-    # This function is used only in conjuction with HDFS exported_data  
+    # This function is used only in conjuction with HDFS exported_data
     #
 
     def create_cell_features_extract_file(self, feature_file=None, export_file=None):
-        df_feature_selections = pd.DataFrame(self.feature_selections) 
+        df_feature_selections = pd.DataFrame(self.feature_selections)
         cellfeat_file = feature_file + '_rnaseq_subset'
         cellfeat_store = pd.HDFStore(cellfeat_file)
 
@@ -931,27 +932,27 @@ class CombinedDataLoader(object):
             df_stored_feature_selections = cellfeat_store.select(CELLFEAT_LIST_KEY)
         except KeyError:
             df_stored_feature_selections = pd.DataFrame()
-            print("%s CREATING cell feature extraction file: %s" % (start_time, cellfeat_file)) 
-        except:
+            print("%s CREATING cell feature extraction file: %s" % (start_time, cellfeat_file))
+        except Exception:
             sys.exit("Unexpected HDFS error")
 
-        if df_stored_feature_selections.equals(df_feature_selections): 
+        if df_stored_feature_selections.equals(df_feature_selections):
             print("%s USING cell feature extraction file: %s" % (start_time, cellfeat_file))
             self.feature_selection_file = cellfeat_file
             cellfeat_store.close()
-            return 
-   
+            return
+
         # replace the current cell feature extraction file with a new one
         if df_stored_feature_selections.size != 0:
             print("%s REPLACING cell feature extraction file: %s" % (start_time, cellfeat_file))
         cellfeat_store.close()
-        os.remove(cellfeat_file)    
+        os.remove(cellfeat_file)
         cellfeat_store = pd.HDFStore(cellfeat_file)
 
         # convert feature-group name to feature index used in H5 key
         input_feature_list = [fname for fname in self.input_features]
         cellfeat_grp_ndx = input_feature_list.index(CELLFEAT_GRP_NAME)
-       
+
         export_store = pd.HDFStore(export_file)
 
         for partition in ['train', 'val']:
@@ -961,10 +962,10 @@ class CombinedDataLoader(object):
             CHUNKSZ = 8192      # tested with much larger (30K)
             eof = False         # raised once all source data is processed
 
-            while eof == False:
+            while eof is False:
                 i = 0
                 df_accum = pd.DataFrame()                   # collects all stored feature-group cols
-                
+
                 while True:
                     in_key_full = '{}_{}'.format(in_key_major, i)
                     try:
@@ -974,12 +975,12 @@ class CombinedDataLoader(object):
                     if t.size == 0:
                         eof = True
                         break
-                    
+
                     df_accum = pd.concat([df_accum, t], axis=1)
-                    i += 1   
+                    i += 1
 
                 # extract selected features from df_accum and append to df_extract
-                if eof == False and df_accum.size != 0:     # catches no 'val' data, for example
+                if eof is False and df_accum.size != 0:     # catches no 'val' data, for example
                     df_extract = pd.DataFrame()             # collects selected feature-group cols
 
                     for k, ndx in enumerate(self.feature_selection_xref):
@@ -990,14 +991,13 @@ class CombinedDataLoader(object):
                     recno += CHUNKSZ
 
         # feature-selections go last, prevent use of this file if incomplete / corrupted
-        cellfeat_store.put(CELLFEAT_LIST_KEY, df_feature_selections)    
+        cellfeat_store.put(CELLFEAT_LIST_KEY, df_feature_selections)
         self.feature_selection_file = cellfeat_file
         stop_time = time.strftime("%X", time.localtime())
         print("%s Cell feature extraction file ready for use" % (stop_time))
 
         cellfeat_store.close()
         export_store.close()
-
 
     def load(self, cache=None, ncols=None, scaling='std', dropna=None,
              agg_dose=None, embed_feature_source=True, encode_response_source=True,
@@ -1168,13 +1168,13 @@ class DataFeeder(keras.utils.Sequence):
 
         input_feature_list = [fname for fname in loader.input_features]
         self.feature_set_count = len(input_feature_list)
-       
+
         # needed reassemble segmented features from this very wide feature-group
         if input_feature_list.count('cell.rnaseq') > 0:
             self.cell_rnaseq_ndx = input_feature_list.index('cell.rnaseq')
         else:
             self.cell_rnaseq_ndx = None
-        
+
         # cell feature-group extractions may be available in a parallel h5 dataset
         if loader.feature_selection_file:
             self.cellfeat_store = pd.HDFStore(loader.feature_selection_file)
@@ -1190,7 +1190,6 @@ class DataFeeder(keras.utils.Sequence):
         _idx = self.index_map[idx]
         start = _idx * self.batch_size
         stop = start + self.batch_size
-        loader = self.data
 
         x, y = read_feature_set_and_labels(
             nbr_features = self.feature_set_count,
@@ -1200,8 +1199,8 @@ class DataFeeder(keras.utils.Sequence):
             HDFStore_base = self.store,
             HDFStore_cellfeat = self.cellfeat_store,
             start = start,
-            stop  = stop
-        )    
+            stop = stop
+        )
         return x, y
 
     def __len__(self):

@@ -334,10 +334,10 @@ def run(params):
         loader.partition_data(cv_folds=args.cv, train_split=train_split, val_split=val_split,
                               cell_types=args.cell_types, by_cell=args.by_cell, by_drug=args.by_drug,
                               cell_subset_path=args.cell_subset_path, drug_subset_path=args.drug_subset_path)
-        
+
         train_gen = CombinedDataGenerator(loader, partition='train', batch_size=args.batch_size, shuffle=args.shuffle)
         val_gen   = CombinedDataGenerator(loader, partition='val',   batch_size=args.batch_size, shuffle=args.shuffle)
-            
+
         if os.path.exists(export_data_fname):
             os.remove(export_data_fname)
 
@@ -351,9 +351,9 @@ def run(params):
         # null-strings because (1) the header storage space is limitted and (2) they are not needed.
 
         store = pd.HDFStore(export_data_fname, complevel=9, complib='blosc:snappy')
-    
+
         # save cell.rnaseq feature names
-        loader.cell_feature_names = loader.df_cell_rnaseq.columns[1:]    
+        loader.cell_feature_names = loader.df_cell_rnaseq.columns[1:]
         df_feature = pd.DataFrame(loader.cell_feature_names, columns=['rnaseq'])
         store.put('feature_names', df_feature)
 
@@ -372,19 +372,19 @@ def run(params):
             for i in range(gen.steps):
                 x_list, y = gen.get_slice(size=args.batch_size, dataframe=True, single=args.single)
                 for j, input_feature in enumerate(x_list):
-                    input_feature = input_feature.astype('float32')     
+                    input_feature = input_feature.astype('float32')
                     store_key = 'x_{}_{}'.format(partition, j)                  # HDFStore key, major 
-                   
+
                     if j == cell_rnaseq_ndx:
                         chunk_size  = 4096
                         _, nbr_cols = input_feature.shape
                         nbr_passes  = (nbr_cols + chunk_size - 1) // chunk_size
-                       
+
                         # store feature set in chunks
-                        for curr in range(nbr_passes): 
+                        for curr in range(nbr_passes):
                             store_subkey = '{}_{}'.format(store_key, curr)      # HDFStore key, minor
                             colorg = chunk_size * curr
-                            colfin = colorg + chunk_size    
+                            colfin = colorg + chunk_size
                             subset = input_feature.iloc[:, colorg:colfin]
                             subset.columns = [''] * len(subset.columns)
                             store.append(store_subkey, subset, format='table')  # store sharded feature_set  
@@ -412,7 +412,7 @@ def run(params):
                         HDFStore = store,
                         start = 0,
                         stop  = 4096
-                    )    
+                    )
                 """
         # cleanup
         store.close()
@@ -422,9 +422,9 @@ def run(params):
 
     # If training/evaluating with previously exported data, recover the names of the individual
     # features associated with the cell_rnaseq feature set from the HDFStore file
-    
+
     if args.use_exported_data:
-        export_file = args.use_exported_data 
+        export_file = args.use_exported_data
         if not os.path.exists(export_file):
             sys.exit("Exported data file: %s not found" % export_file)
 
@@ -439,13 +439,13 @@ def run(params):
     # however, and all features are selected in the absence of that arg.
 
     if args.cell_feature_subset_path and args.use_exported_data:
-        export_file = args.use_exported_data 
+        export_file = args.use_exported_data
         feature_file = args.cell_feature_subset_path
         if not os.path.exists(feature_file):
             sys.exit("Cell feature selection file: %s not found" % feature_file)
 
         loader.select_cell_features(feature_file)
-        loader.create_cell_features_extract_file(feature_file, export_file)  
+        loader.create_cell_features_extract_file(feature_file, export_file)
 
     #
     # Build the model 
@@ -508,6 +508,7 @@ def run(params):
         history_logger = LoggingCallback(logger.debug)
 
         callbacks = [candle_monitor, timeout_monitor, history_logger]
+
         if args.reduce_lr:
             callbacks.append(reduce_lr)
         if args.warmup_lr:
@@ -553,14 +554,14 @@ def run(params):
                                           validation_steps=val_gen.steps)
 
         wall_tm_end = time.time()
-        cpu_tm_end  = time.process_time() 
+        cpu_tm_end  = time.process_time()
         wall_secs   = wall_tm_end - wall_tm_org
         cpu_secs    = cpu_tm_end  - cpu_tm_org
 
         total_samples        = train_gen.size + val_gen.size
         samples_per_wall_sec = (total_samples * args.epochs) / wall_secs
         samples_per_cpu_sec  = (total_samples * args.epochs) / cpu_secs
-    
+
         print('Elapsed time: %.3f, CPU seconds: %.3f' % (wall_secs, cpu_secs))
         print('Samples per second (elapsed): %.3f, CPU: %.3f' % (samples_per_wall_sec, samples_per_cpu_sec))
 
